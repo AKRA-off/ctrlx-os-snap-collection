@@ -1,0 +1,241 @@
+# Run the pipeline only on MRs, tags, and default branch
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+variables:
+  BUILD_DIR: "build"
+  DOCS_DIR: "docs"
+  DOCS_REPO: "https://gitlab.com/${CI_PROJECT_NAMESPACE}/kord-api-doc.git"
+  DOCS_BRANCH: "main"
+  CMAKE_URL: "https://github.com/Kitware/CMake/releases/download/v3.31.5/cmake-3.31.5-linux-x86_64.tar.gz"
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}"
+
+stages:
+  - build-release
+  - test-packages
+  - upload
+  - build-docs
+  - deploy-docs
+
+# Reusable CMake installation script
+.cmake_install: &cmake_install
+  - apt-get update
+  - apt-get install -y wget lcov
+  - wget ${CMAKE_URL} -O /tmp/cmake.tar.gz > /dev/null
+  - tar -xvzf /tmp/cmake.tar.gz -C /usr/local --strip-components=1 > /dev/null
+  - cmake --version
+
+.eigen_install: &eigen_install
+  - apt-get update
+  - apt-get install -y libeigen3-dev
+
+# Production release build
+build-release:
+  stage: build-release
+  image: gcc:8.5.0
+  before_script:
+    - *cmake_install
+    - *eigen_install
+  script:
+    - mkdir -p ${BUILD_DIR}
+    - cd ${BUILD_DIR}
+    - git fetch --all --tags
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        export CI_INITIAL_TAG_BRANCH=$CI_COMMIT_TAG
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      elif [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_DEFAULT_BRANCH"
+      fi
+    - echo "Version ${CI_INITIAL_TAG_BRANCH}"
+    - echo "Namespace ${CI_PROJECT_NAMESPACE}"
+    - cmake .. -DCMAKE_BUILD_TYPE=Release -DKORD_WITH_TESTS=ON -DKORD_WITH_EXAMPLES=ON -DKORD_WITH_COVERAGE=OFF -DKORD_PROTOCOL_VERSION=${CI_INITIAL_TAG_BRANCH} -DKORD_PROTOCOL_NAMESPACE=${CI_PROJECT_NAMESPACE}
+    - make -j $(nproc)
+    - make package
+  artifacts:
+    paths:
+      - ${BUILD_DIR}/
+    expire_in: 1 week
+
+test-packages:
+  stage: test-packages
+  image: gcc:8.5.0
+  dependencies:
+    - build-release
+  before_script:
+    - *cmake_install
+    - *eigen_install
+    - apt-get update
+    - apt-get install git -y
+  script:
+    - git fetch --all --tags
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        export CI_INITIAL_TAG_BRANCH=$CI_COMMIT_TAG
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      elif [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_DEFAULT_BRANCH"
+      fi
+      # Clone the kord-protocol repository
+    - git clone https://gitlab.com/${CI_PROJECT_NAMESPACE}/kord-protocol.git -b ${CI_INITIAL_TAG_BRANCH}
+    - cd kord-protocol
+    # Build the kord-protocol library
+    - mkdir -p build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Release
+    - make -j $(nproc)
+    # Make and install the kord-protocol packages
+    - make package
+    - dpkg -i *.deb
+    # Install the kord-api packages
+    - cd ${CI_PROJECT_DIR}/build
+    - dpkg -i *.deb
+
+    - cd ${CI_PROJECT_DIR}/ci/minimal-example
+    - mkdir -p build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Release
+    - make -j $(nproc)
+
+# Upload package to GitLab package registry, only for release tags
+upload-package:
+  stage: upload
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  dependencies:
+    - build-release
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+.*$/
+  script:
+    - |
+      apk add --no-cache curl
+
+      export VERSION=$(cat ${CI_PROJECT_DIR}/version.txt)
+      for file in ${BUILD_DIR}/*.deb; do
+        if [ -f "$file" ]; then
+          filename=$(basename "$file")
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$file" "${PACKAGE_REGISTRY_URL}/${filename}"
+          echo "Uploaded $filename to ${PACKAGE_REGISTRY_URL}/${filename}"
+        fi
+      done
+      echo "Uploaded all packages to ${PACKAGE_REGISTRY_URL}"
+
+    - |
+      ASSETS='[
+        {
+          "name": "kord-api-libs_'${VERSION}'_amd64.deb",
+          "url": "'${PACKAGE_REGISTRY_URL}'/kord-api-libs_'${VERSION}'_amd64.deb"
+        },
+        {
+          "name": "kord-api-libs-dev_'${VERSION}'_amd64.deb",
+          "url": "'${PACKAGE_REGISTRY_URL}'/kord-api-libs-dev_'${VERSION}'_amd64.deb"
+        },
+        {
+          "name": "kord-api-examples_'${VERSION}'_amd64.deb",
+          "url": "'${PACKAGE_REGISTRY_URL}'/kord-api-examples_'${VERSION}'_amd64.deb"
+        }
+      ]'
+
+    - |
+      release-cli create \
+        --tag-name ${CI_COMMIT_TAG} \
+        --name "${CI_COMMIT_TAG}" \
+        --description "${CI_COMMIT_TAG}" \
+        --assets-link "${ASSETS}"
+
+build-docs:
+  stage: build-docs
+  image: alpine:3.21.2
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+.*$/
+  needs:
+    - upload-package
+  before_script:
+    - apk update
+    - apk add --no-cache doxygen make cmake build-base eigen-dev
+    - apk add --no-cache git python3 py3-pip py3-virtualenv
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip install --no-cache-dir sphinx breathe sphinx-rtd-theme
+  script:
+    - cd ${CI_PROJECT_DIR}
+    - git fetch --all --tags
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        export CI_INITIAL_TAG_BRANCH=$CI_COMMIT_TAG
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      elif [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        export CI_INITIAL_TAG_BRANCH="$CI_DEFAULT_BRANCH"
+      fi
+    - export VERSION=$(cat ${CI_PROJECT_DIR}/version.txt)
+    - echo "Branch ${CI_INITIAL_TAG_BRANCH}"
+    - rm -rf build
+    - mkdir -p build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Release -DKORD_WITH_TESTS=ON -DKORD_WITH_EXAMPLES=ON -DKORD_WITH_COVERAGE=OFF -DKORD_WITH_DOCS=ON -DKORD_PROTOCOL_VERSION=${CI_INITIAL_TAG_BRANCH} -DKORD_PROTOCOL_NAMESPACE=${CI_PROJECT_NAMESPACE}
+    - make docs
+    - mkdir -p ${CI_PROJECT_DIR}/artifacts/versions/"$VERSION"
+    - cp -r ./docs_html/* ${CI_PROJECT_DIR}/artifacts/versions/"$VERSION"/
+    - cd ${CI_PROJECT_DIR}
+
+  artifacts:
+    paths:
+      - ${CI_PROJECT_DIR}/artifacts/versions/
+    expire_in: 1 week
+
+deploy-docs:
+  stage: deploy-docs
+  image: alpine:latest
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+.*$/
+  needs:
+    - build-docs
+  before_script:
+    # Check whether DOCS_BASE_URL is set
+    - |
+      if [ -z "$DOCS_BASE_URL" ]; then
+        echo "DOCS_BASE_URL is not set"
+        exit 1
+      fi
+  script:
+    # Install Git (sed is already included in Alpine)
+    - apk add --no-cache git
+
+    # Configure Git
+    - git config --global user.email "ci@kassowrobots.com"
+    - git config --global user.name "Kassow Robots CI"
+
+    # Retrieve the version from the version.txt file
+    - export VERSION=$(cat ${CI_PROJECT_DIR}/version.txt)
+    - echo "Version $VERSION"
+
+    # Clone the documentation repository with depth 1 for faster cloning
+    - git clone --depth 1 "https://${DOCS_DEPLOY_USERNAME}:${DOCS_DEPLOY_PASSWORD}@${DOCS_REPO#https://}" docs-deploy
+
+    - cd docs-deploy
+    - git checkout "$DOCS_BRANCH"
+
+    # Ensure the versions directory exists within public
+    - mv public public_old
+    - mkdir -p public/versions
+
+    - ls -laR ${CI_PROJECT_DIR}
+    - ls -laR ${CI_PROJECT_DIR}/artifacts/versions
+    - cp -r ${CI_PROJECT_DIR}/artifacts/versions/${VERSION}/* public/
+    - ls -laR public/versions
+
+    # Copy new documentation into public/versions/
+    - cp -r public_old/versions/* public/versions/
+    - rm -rf public/versions/${VERSION}
+    - cp -r ${CI_PROJECT_DIR}/artifacts/versions/${VERSION} public/versions/
+    - rm -rf public_old
+
+    # Commit and push changes
+    - git add .
+    - git commit -m "Deploy docs for version $VERSION on $(date)"
+    - git push https://"$DOCS_DEPLOY_USERNAME":"$DOCS_DEPLOY_PASSWORD"@"${DOCS_REPO#https://}" HEAD:"$DOCS_BRANCH"

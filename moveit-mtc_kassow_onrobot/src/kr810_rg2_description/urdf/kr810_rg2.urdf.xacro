@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="kr810_rg2">
+
+  <!-- Arguments for hardware configuration -->
+  <xacro:arg name="use_fake_hardware" default="true"/>
+  <xacro:arg name="robot_ip" default="192.168.1.100"/>
+
+  <!-- Import KR810 robot description -->
+  <xacro:include filename="$(find kr_robot_description)/kr810/urdf/kr810_description.urdf.xacro"/>
+
+  <!-- Import RG2 gripper description -->
+  <xacro:include filename="$(find kr810_rg2_description)/urdf/rg2_gripper.urdf.xacro"/>
+
+  <!-- Import ros2_control configuration -->
+  <xacro:include filename="$(find kr810_rg2_description)/urdf/kr810_rg2.ros2_control.xacro"/>
+
+  <!-- Instantiate KR810 robot -->
+  <xacro:kr810_description/>
+
+  <!-- Attach RG2 gripper to KR810 end_effector -->
+  <xacro:rg2_gripper parent="end_effector" prefix="">
+    <origin xyz="0 0.01 0.065" rpy="0 0 0"/>
+  </xacro:rg2_gripper>
+
+  <!-- Add ros2_control -->
+  <xacro:kr810_rg2_ros2_control
+    name="kr810_rg2"
+    initial_positions_file="$(find kr810_rg2_description)/config/initial_positions.yaml"
+    use_fake_hardware="$(arg use_fake_hardware)"
+    robot_ip="$(arg robot_ip)"/>
+
+</robot>

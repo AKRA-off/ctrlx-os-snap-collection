@@ -1,0 +1,16 @@
+# Initial joint positions for KR810 + RG2 gripper
+# These positions represent a "ready" pose for the robot
+
+initial_positions:
+  # KR810 arm joints (7 DOF)
+  joint_1: 0.0      # Base rotation
+  joint_2: -0.785   # Shoulder (approx -45 degrees)
+  joint_3: 0.0      # Elbow rotation
+  joint_4: -1.57    # Elbow pitch (approx -90 degrees)
+  joint_5: 0.0      # Wrist rotation 1
+  joint_6: 0.0      # Wrist pitch
+  joint_7: 0.0      # Wrist rotation 2
+
+  # RG2 gripper (open position - matches SRDF "open" state)
+  left_finger_joint: 0.025   # Open position (25mm)
+  right_finger_joint: -0.025 # Mimic left finger (inverted)

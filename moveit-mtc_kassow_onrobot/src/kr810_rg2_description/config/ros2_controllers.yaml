@@ -1,0 +1,74 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    kr810_arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    rg2_gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+kr810_arm_controller:
+  ros__parameters:
+    joints:
+      - joint_1
+      - joint_2
+      - joint_3
+      - joint_4
+      - joint_5
+      - joint_6
+      - joint_7
+
+    command_interfaces:
+      - position
+      - velocity
+
+    state_interfaces:
+      - position
+      - velocity
+
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    allow_nonzero_velocity_at_trajectory_end: true  # Required for MoveIt Servo streaming control
+    open_loop_control: true  # Open loop for directJControl - KORD handles internal closed loop
+    allow_integration_in_goal_trajectories: true
+
+    constraints:
+      stopped_velocity_tolerance: 0.5  # Extremely relaxed - let KORD handle all settling
+      goal_time: 0.0  # Disabled - no time pressure, let trajectory take as long as needed
+      # EXTREMELY relaxed tolerances - open loop mode, KORD handles actual control
+      # trajectory: tolerance during path following (1.0 rad = ~57 degrees)
+      # goal: tolerance at end of trajectory (1.5 rad = ~86 degrees) - effectively disabled
+      joint_1: {trajectory: 1.0, goal: 1.5}
+      joint_2: {trajectory: 1.0, goal: 1.5}
+      joint_3: {trajectory: 1.0, goal: 1.5}
+      joint_4: {trajectory: 1.0, goal: 1.5}
+      joint_5: {trajectory: 1.0, goal: 1.5}
+      joint_6: {trajectory: 1.0, goal: 1.5}
+      joint_7: {trajectory: 1.0, goal: 1.5}
+
+rg2_gripper_controller:
+  ros__parameters:
+    joints:
+      - left_finger_joint
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+      - velocity
+
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    allow_integration_in_goal_trajectories: true
+
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.0
+      left_finger_joint: {trajectory: 0.01, goal: 0.005}

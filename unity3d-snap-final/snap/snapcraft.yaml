@@ -1,0 +1,45 @@
+name: unity-snap
+version: 0.4.3
+summary: Unity WebGL app served on port 8080
+description: Unity WebGL application served via Python HTTP server
+confinement: strict
+compression: lzo
+grade: stable
+base: core22
+
+apps:
+  unity-snap:
+    command: bin/server.py
+    daemon: simple
+    install-mode: enable
+    restart-delay: 3s
+    restart-condition: always
+    stop-timeout: 10s
+    plugs:
+      - network
+      - network-bind
+    environment:
+      PYTHONPATH: "$SNAP/usr/lib/python3/dist-packages"
+
+parts:
+  server:
+    plugin: python
+    source: .
+    build-environment:
+      - PYTHONPATH: "$SNAPCRAFT_PART_INSTALL/usr/lib/python3/dist-packages"
+    stage-packages:
+      - python3
+      - python3-dev
+      - python3-wheel
+    python-packages:
+      - websockets
+
+  unity-webgl:
+    plugin: dump
+    source: unity-build
+    organize:
+      '*': www/
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64

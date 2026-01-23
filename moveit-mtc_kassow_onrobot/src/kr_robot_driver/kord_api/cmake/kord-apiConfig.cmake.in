@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+# Declare dependency on kord_protocol
+include(CMakeFindDependencyMacro)
+find_dependency(kord-protocol REQUIRED)
+find_dependency(Threads REQUIRED)
+
+# Include kord-api targets
+include("${CMAKE_CURRENT_LIST_DIR}/kord-apiTargets.cmake")

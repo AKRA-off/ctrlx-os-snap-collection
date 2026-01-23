@@ -1,0 +1,7 @@
+maintainer: Akra
+boschrexroth: boschrexroth
+onnx: yolov8n-seg.onnx
+cam_select: 3
+conf_thres: 0.3
+iou_thres: 0.5
+use_hailo: false

@@ -1,0 +1,78 @@
+name: modbus-rtu-master
+title: Modbus RTU master
+version: 0.0.7
+summary: Modbus RTU
+description: |
+  Settings available through Datalayer
+base: core22
+confinement: strict
+grade: stable
+
+architectures:
+  - build-on: [amd64]
+    build-for: [arm64]
+
+apps:
+  client:
+    command: bin/main.py
+    plugs:
+      - network
+      - network-bind
+      - datalayer
+      - system-observe
+      - system-files
+      - shared-memory
+      - camera
+      - serial-port
+      - raw-usb
+      - hardware-observe
+    daemon: simple
+    restart-condition: always
+    passthrough:
+      restart-delay: 30s
+    environment:
+        "LD_LIBRARY_PATH": "$LD_LIBRARY_PATH:$SNAP/usr/lib/python3.10/dist-packages"
+
+
+parts:
+  client:
+    plugin: python
+    source: .
+    build-environment:
+      - PYTHONPATH: "$SNAPCRAFT_PART_INSTALL/usr/lib/python3/dist-packages"
+    override-build: |
+      snapcraftctl build
+      ln -sf ../usr/lib/libsnapcraft-preload.so $SNAPCRAFT_PART_INSTALL/lib/libsnapcraft-preload.so
+    stage-packages:
+      - libzmq5
+      #- ctrlx-datalayer
+      - libsystemd-dev
+
+    python-packages:
+      - pymodbus
+      - ctrlx-datalayer
+      - ctrlx-fbs
+      - pyserial
+    build-packages:
+      - build-essential
+
+
+  datalayerdeb:
+    plugin: dump
+    source: https://github.com/boschrexroth/ctrlx-automation-sdk/releases/download/3.4.0/ctrlx-datalayer-2.8.6.deb
+    source-type: deb
+
+
+plugs:
+  datalayer:
+    interface: content
+    content: datalayer
+    target: $SNAP_DATA/.datalayer
+  
+  system-files:
+    interface: system-files
+    write: [/dev/shm, /proc/sys/net/core, /usr/bin, /usr/bin/mount, /proc]
+
+  shared-memory:
+    interface: shared-memory
+    private: true

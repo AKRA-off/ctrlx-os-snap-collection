@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Ctrlx AI Detector</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{url_for('static', filename='bootstrap/bootstrap.min.css')}}" rel="stylesheet">
+  <script src="{{url_for('static', filename='bootstrap/bootstrap.bundle.min.js')}}"></script>
+  <style>
+  .container_cust{
+      max-width: 1600px;
+      overflow: hidden;
+      background: #aaa;
+  img{
+      width: 100%;
+      object-fit: contain;
+  }
+  .image-container {
+    height: 1200px;
+    width: 1600px;
+    background: #aaa;
+  }
+  .bg {background-image: url("static/image/background.png");<!-- height: 900px;     width: 1700px; 100vh; -->
+      background-repeat: no-repeat;
+      background-size: auto; 
+       
+       
+      }
+  .bgcol{
+      background: black;
+      background-color: black;      
+      color: black; 
+      padding: 0.5em;
+  }
+
+
+  .mar1{
+      margin-left: 300px; 
+
+  </style>
+    
+</head>
+<body>  
+
+    
+
+</nav>
+
+<!-- <div class="navbar-brand  bg-dark navbar-dark">
+<a href="index.html"><img src="{{url_for('static', filename='img/rexroth.png')}}" style="max-width:30%;" alt="MachData Logo"
+        class="img-responsive logo"></a>
+    
+
+</div>
+-->
+    
+<nav class="navbar navbar-expand-sm navbar-light" style="background-color: #c5c5c5;">
+    
+  <div class="container-fluid">
+    <ul class="navbar-nav"> 
+          <img src="{{url_for('static', filename='image/rexroth.png')}}" style="max-width:23%; min-width: 23%; float: left"></img>   
+      <li class="nav-item active">
+          <li><a href="index" class="nav-link active"><i class="lnr lnr-home"></i> <span style="font-size: 30px;">Home</span></a></li>   
+      </li>   
+      <li class="nav-item">
+        <a class="nav-link" href="../settings"><span style="font-size: 30px;">Settings</span></a>   
+      </li>
+     </ul>   
+  </div>
+  
+     <div class="container-fluid">
+            <div class="navbar-brand" style="margin: 0 auto; margin-left: 10px; margin-top: 3px;">
+              <h1>AI Detector</h1>
+             </div>
+              <div class="navbar-brand" style="margin: 0 auto;">
+                  <img src="{{url_for('static', filename='image/RRline.png')}}" style="max-width:20%;   float: right;  min-width: 20%;  text-align: right;"></img>
+              </div>    
+      </div>    
+  
+  
+    
+  </div>
+</nav>
+  
+<div class="container mt-5">
+  <div class="row align-items-center">
+    <div class="col-sm-2">
+      <p>Press "Run" button to start</p>
+        <form action="{{ url_for('index') }}" method="post">
+            <input type="hidden" value="1" name="bool_flask" placeholder="">
+            <input type="submit" class="btn btn-outline-dark btn-lg" value="Run">
+        </form>
+      <hr class="d-sm-none">
+    </div>
+    <div class="col-sm-10">
+      <h2>Your Image</h2>
+      <h5>After inference</h5>
+      <div class="container_cust">
+        <img src="{{url_for('download_file', filename='inf0.jpg')}}" alt="Main Image">
+      </div>
+      <p>Your processing time is {{time_toweb}} seconds</p>
+    </div>
+  </div>
+</div>
+    
+
+<div class="mt-5 p-4 bg-dark text-white text-center">
+  <p>2025 Bosch Rexroth VN</p>
+</div>
+
+</body>
+</html>

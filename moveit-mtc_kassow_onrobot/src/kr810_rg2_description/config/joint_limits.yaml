@@ -1,0 +1,72 @@
+# Joint limits for KR810 + RG2
+# Generous limits (1.0 rad/s velocity, 0.5 rad/s² accel) to avoid controller rejections
+# Actual speeds controlled by MoveIt Servo config (conservative for safety)
+# Position limits: Actual robot limits minus 10° safety margin
+
+joint_limits:
+  joint_1:
+    has_position_limits: true
+    min_position: -6.11  # -350° (actual -360°, minus 10° margin)
+    max_position: 6.11   # +350°
+    has_velocity_limits: true
+    max_velocity: 1.0  # rad/s - generous limit, actual speed controlled by servo config
+    has_acceleration_limits: true
+    max_acceleration: 0.5  # rad/s² - generous limit for smooth transitions
+  joint_2:
+    has_position_limits: true
+    min_position: -2.97  # -170° (actual -180°, minus 10° margin)
+    max_position: 2.97   # +170°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  joint_3:
+    has_position_limits: true
+    min_position: -6.11  # -350° (actual -360°, minus 10° margin)
+    max_position: 6.11   # +350°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  joint_4:
+    has_position_limits: true
+    min_position: -2.97  # -170° (actual -180°, minus 10° margin) - CRITICAL!
+    max_position: 2.97   # +170°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  joint_5:
+    has_position_limits: true
+    min_position: -6.11  # -350° (actual -360°, minus 10° margin)
+    max_position: 6.11   # +350°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  joint_6:
+    has_position_limits: true
+    min_position: -6.11  # -350° (actual -360°, minus 10° margin)
+    max_position: 6.11   # +350°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  joint_7:
+    has_position_limits: true
+    min_position: -6.11  # -350° (actual -360°, minus 10° margin)
+    max_position: 6.11   # +350°
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 0.5
+  left_finger_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0  # m/s
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  right_finger_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0  # m/s
+    has_acceleration_limits: true
+    max_acceleration: 1.0

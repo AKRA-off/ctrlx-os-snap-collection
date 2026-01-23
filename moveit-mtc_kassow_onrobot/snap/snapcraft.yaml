@@ -1,0 +1,64 @@
+name: ros2-moveit-mtc-kr810
+version: '2.4.1'
+summary: Snap with MoveIt2, MoveIt Task Constructor and ros2_control for KR + RG2
+description: |
+  It runs a simulated Kassow KR robot with OnRobot RG2 gripper, using ros2_control, MoveIt2, and MoveIt Task Constructor for motion planning and task execution. Supports both Panda (original) and KR810+RG2 configurations.
+
+base: core22
+grade: stable
+confinement: strict
+
+parts:
+  ros-app:
+    plugin: dump
+    source: ./install
+    # organize:
+    #  '*': ros-app/
+    stage-packages:
+      - ros-humble-moveit
+      - ros-humble-moveit-servo
+      - ros-humble-xacro
+      - ros-humble-ros2-control
+      - ros-humble-ros2-controllers
+      - ros-humble-gripper-controllers
+      - ros-humble-moveit-resources-panda-moveit-config
+      - ros-humble-moveit-resources-panda-description
+      - libzmq5 # related with dataLayer (not used here)
+      - ctrlx-datalayer # related with dataLayer (not used here)
+    override-build: |
+        snapcraftctl build
+                
+  wrapper-scripts:
+    plugin: dump
+    source: ./wrapper
+    organize:
+      '*' : usr/bin/
+
+apps:
+
+  # KR + RG2 robot apps
+  visualization-kr810:
+    command: usr/bin/run-visualization-kr810.sh
+    plugs:
+      - ros-base
+      - network
+      - network-bind
+  joystick-mtc-complete:
+    command: usr/bin/run-joystick-mtc-complete.sh
+    plugs:
+      - ros-base
+      - network
+      - network-bind
+      - raw-input #we add it for joystick support
+
+
+plugs:
+  ros-base:
+    interface: content
+    content: executables
+    target: $SNAP/rosruntime
+    
+  datalayer:
+    interface: content
+    content: datalayer
+    target: $SNAP_DATA/.datalayer

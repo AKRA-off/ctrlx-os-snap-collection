@@ -1,0 +1,40 @@
+# MoveIt controller configuration for KR810 + RG2 (FAKE HARDWARE)
+# This configuration uses FollowJointTrajectory for the gripper
+# since ros2_control's fake hardware uses JointTrajectoryController
+
+# Trajectory execution parameters
+# Note: Fake hardware with open_loop_control executes trajectories in real-time
+# Monitoring is disabled because scaling the timeout also scales the trajectory execution time
+trajectory_execution:
+  allowed_execution_duration_scaling: 20.0  # Not used when monitoring is disabled
+  allowed_goal_duration_margin: 5.0  # Extra margin for goal settling time
+  allowed_start_tolerance: 0.01
+  trajectory_duration_monitoring: false  # DISABLED for fake hardware - trajectories execute in real-time
+
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - kr810_arm_controller
+    - rg2_gripper_controller
+
+  kr810_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - joint_1
+      - joint_2
+      - joint_3
+      - joint_4
+      - joint_5
+      - joint_6
+      - joint_7
+
+  rg2_gripper_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - left_finger_joint
+      - right_finger_joint

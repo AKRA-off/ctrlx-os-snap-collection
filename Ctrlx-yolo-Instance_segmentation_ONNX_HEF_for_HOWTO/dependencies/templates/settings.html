@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Ctrlx AI Detector Settings</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{url_for('static', filename='bootstrap/bootstrap.min.css')}}" rel="stylesheet">
+  <script src="{{url_for('static', filename='bootstrap/bootstrap.bundle.min.js')}}"></script>
+  <style>
+  .fakeimg {
+    height: 600px;
+    width: 600px;
+    background: #aaa;
+  }
+   .custom-btn {
+    background-color: #000000;
+    color: #fff;
+   }
+    ::-webkit-file-upload-button { <!-- download button CSS             background: transparent;      background-color: transparent;      color: transparent; padding: 0.5em;-->
+        background-color: #ffffff00;
+        margin: 0px;
+        padding: 0px;
+        border: 0px;
+    }
+    .inputcustom  {
+        padding-top: 50px;
+        padding-bottom: 50px;
+        padding-left: 50px;
+        padding-right: 50px;
+    }  
+    .cusdiv {
+        margin-bottom: 20px; /* adds 2 units of spacing after each div */
+        margin-top: 20px
+    }
+    .pad1 {
+        margin-bottom: 5px; /* adds 2 units of spacing after each div */
+        margin-top: 5px
+    }
+      
+  </style>
+</head>
+<body>
+
+
+
+<nav class="navbar navbar-expand-sm navbar-light" style="background-color: #c5c5c5;">
+  <div class="container-fluid">
+    <ul class="navbar-nav">
+      <img src="{{url_for('static', filename='image/rexroth.png')}}" style="max-width:23%; min-width: 23%; float: left"></img>    
+      <li class="nav-item">
+        <li><a href="index" class="nav-link"><i class="lnr lnr-home"></i> <span style="font-size: 30px;">Home</span></a></li> 
+      </li>
+      <li class="nav-item active">
+        <a href="settings" class="nav-link active"><span style="font-size: 30px;">Settings</span></a> 
+      </li>
+    </ul>
+  </div>
+ <div class="container-fluid">
+        <div class="navbar-brand" style="margin: 0 auto; margin-left: 10px; margin-top: 3px;">
+          <h1>AI Detector</h1>
+         </div>
+          <div class="navbar-brand" style="margin: 0 auto;">
+              <img src="{{url_for('static', filename='image/RRline.png')}}" style="max-width:20%;   float: right;  min-width: 20%;  text-align: right;"></img>
+          </div>    
+  </div>    
+</nav>
+
+
+    
+<div class="container py-4">
+
+    <div class="row align-items-md-stretch">
+      <div class="col-md-6">
+        <div class="h-100 p-5 text-bg-dark rounded-3">
+        <form action="/upload_file" method="POST" enctype="multipart/form-data">
+            <h2>Upload file</h2>
+            <input type="file" name="file" class="btn btn-outline-light"><br>  <!-- class="btn btn-outline-light" -->
+            <input type="hidden" name="dir_path" placeholder="Example: Test/">
+            <br>
+            <button type="submit" class="btn btn-outline-light">Upload file</button>   <!-- class="btn btn-outline-light pad1" -->
+        </form>  
+        </div>
+      </div>
+        
+     <div class="col-md-6">
+        <div class="h-100 p-5 text-bg-dark rounded-3">
+          <form action="/delete_file" method="POST">
+            <h2>Delete file</h2>
+            <input type="text" name="file_path" placeholder="Example: test.onnx">
+            <button type="submit" class="btn btn-outline-light">Delete file</button>
+          </form>
+        </div>
+          
+      </div>
+       <div class="col-md-6 cusdiv">
+        <div class="h-100 p-5 bg-body-tertiary border rounded-3">
+        <form action="{{ url_for('settings') }}" method="post">
+            <input type="hidden" value="1" name="save_config" placeholder="">
+            <input type="submit" class="btn btn-outline-dark btn-lg" value="Save Settings">
+        </form>
+        </div>
+        </div> 
+
+   
+        <div class="col-md-6 cusdiv" id="cam1-settings" style="display: block">
+          <div class="h-100 p-5 bg-body-tertiary border rounded-3">  
+            <h2>Settings for Camera 1</h2>
+            <br>  
+          <form action="{{ url_for('settings') }}" method="post">
+            <h4>Select Model</h4>  
+            <input type="text" value="" name="model_name" placeholder={{ model_name }}>
+            <input type="submit"class="btn btn-outline-dark btn-sm" value="Change">  
+          </form>
+            
+          <form action="{{ url_for('settings') }}" method="post">
+            <h4>Input Object Confidence Threshold</h4>  
+            <input type="text" value="" name="hmi_conf_thres" placeholder={{ hmi_conf_thres }} min="0.001" max="1">
+            <input type="submit"class="btn btn-outline-dark btn-sm" value="Change">  
+          </form>
+            
+          <form action="{{ url_for('settings') }}" method="post">
+            <h4>IOU threshold for NMS</h4>
+            <input type="text" value="" name="hmi_iou_thres" placeholder={{ hmi_iou_thres }} min="0.001" max="1">
+            <input type="submit"class="btn btn-outline-dark btn-sm" value="Change">
+          </form>
+
+          <form action="{{ url_for('settings') }}" method="post">
+            <label for="hailoSelect" class="form-label"><h4>Inference Mode ({{ 'HAILO' if use_hailo else 'Standard ONNX' }})</h4></label>
+            <select class="form-select" id="hailoSelect" name="use_hailo">
+              <option selected>{% if use_hailo %}
+                1 - HAILO Accelerator
+                  {% else %}
+                0 - Standard ONNX
+                  {% endif %}
+              </option>
+              <option value="0">0 - Standard ONNX</option>
+              <option value="1">1 - HAILO Accelerator</option>
+            </select>
+            <input type="submit" class="btn btn-outline-dark btn-sm" value="Change" style="margin-top: 0.5rem;">
+          </form>
+          <p style="margin-top: 0.5rem;">HAILO uses .hef models, Standard uses .onnx models</p>
+
+            <form action="{{ url_for('settings') }}" method="post">
+                <label for="exampleSelect" class="form-label"><h4>Camera Selection Menu ({{ variable }})</h4></label>
+                <select class="form-select" id="camSelect" name="variable">
+                  <option selected>{% if variable == 0 %}
+                    0 - Hikrobot GiGE
+                      {% elif variable == 1 %}
+                    1 - USB Webcam
+                      {% elif variable == 2 %}
+                    2 - Preloaded Image
+                      {% endif %}
+                  </option>
+                  <option value="0">0 - Hikrobot GiGE</option>
+                  <option value="1">1 - USB Webcam</option>
+                  <option value="2">2 - Preloaded Image</option>
+                </select>
+                <input type="submit"class="btn btn-outline-dark btn-sm" value="Change">
+            </form>
+            <p>Hikrobot(0) USB(1) Preloaded Image(2)</p>
+            {% if variable == 0 %}
+            {% if hik_connected == 0 %}
+            <h2>Manage Camera connection:</h2>
+            <form action="{{ url_for('settings') }}" method="post">
+                <input type="hidden" value="1" name="conn_hik" placeholder="">
+                <input type="submit" class="btn btn-outline-dark btn-lg" value="Connect">
+            </form>
+            {% endif %}
+            {% if hik_connected == 1 %}
+            <form action="{{ url_for('settings') }}" method="post">
+                <input type="hidden" value="1" name="disc_hik" placeholder="">
+                <input type="submit" class="btn btn-outline-dark btn-lg" value="Disconnect">
+            </form>
+            {% endif %}
+            {% endif %}
+            {% if variable == 1 %}
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Input Webcam ID</h4>  
+              <input type="text" value="" name="web_conn_arr" placeholder={{ web_conn_arr }} min="0" max="100" step="1">
+              <input type="submit"class="btn btn-outline-dark btn-sm" value="Change">  
+            </form>
+            {% endif %}
+
+        </div>
+        </div> 
+        
+       <div class="col-md-6 cusdiv">
+        <div class="h-100 p-5 text-bg-dark rounded-3">
+        <h1>Elements located in the Snap folder </h1>
+            {% if files %}
+                <h2>Files</h2>
+                <ul>
+                  {% for file in files %}
+                    <li>{{ file }}</li>
+                  {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+      </div>
+
+        
+</div>
+
+
+</div>
+    
+
+   
+<div class="mt-5 p-4 bg-dark text-white text-center">
+  <p>2025 Bosch Rexroth VN</p>
+</div>
+
+</body>
+</html>
+<script>
+    /*var init = true;
+    if (init){
+        var cam_hide1 = false;
+        var cam_hide2 = false;
+        var cam_hide3 = false;
+        var cam_hide4 = false;
+        var cam_hide5 = false;
+        init = false;
+
+    }
+    */
+        
+    
+
+    /*
+
+    var cam_hide1;
+    var cam_hide2;
+    var cam_hide3;
+    var cam_hide4;
+    var cam_hide5;
+  
+        
+    document.getElementById('cam1-select').onclick = function() {
+       document.getElementById('cam1-settings').style.display = 'block'; //Show
+       document.getElementById('cam2-settings').style.display = 'none'; //Hide
+       document.getElementById('cam3-settings').style.display = 'none'; //Hide
+       document.getElementById('cam4-settings').style.display = 'none'; //Hide
+       document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+    }
+    
+    document.getElementById('cam2-select').onclick = function() {
+       document.getElementById('cam1-settings').style.display = 'none'; //Hide
+       document.getElementById('cam2-settings').style.display = 'block'; //Show
+       document.getElementById('cam3-settings').style.display = 'none'; //Hide
+       document.getElementById('cam4-settings').style.display = 'none'; //Hide
+       document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+    } 
+    
+    document.getElementById('cam3-select').onclick = function() ){
+       document.getElementById('cam1-settings').style.display = 'none'; //Hide
+       document.getElementById('cam2-settings').style.display = 'none'; //Hide
+       document.getElementById('cam3-settings').style.display = 'block'; //Show
+       document.getElementById('cam4-settings').style.display = 'none'; //Hide
+       document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+    } 
+    
+    document.getElementById('cam4-select').onclick = function() {
+       document.getElementById('cam1-settings').style.display = 'none'; //Hide
+       document.getElementById('cam2-settings').style.display = 'none'; //Hide
+       document.getElementById('cam3-settings').style.display = 'none'; //Hide
+       document.getElementById('cam4-settings').style.display = 'block'; //Show
+       document.getElementById('cam5-settings').style.display = 'none'; //Hide  
+    }
+    
+    document.getElementById('cam5-select').onclick = function() {
+       document.getElementById('cam1-settings').style.display = 'none'; //Hide
+       document.getElementById('cam2-settings').style.display = 'none'; //Hide
+       document.getElementById('cam3-settings').style.display = 'none'; //Hide
+       document.getElementById('cam4-settings').style.display = 'none'; //Hide
+       document.getElementById('cam5-settings').style.display = 'block'; //Show 
+        
+
+        
+    
+ 
+*/
+    /*
+    document.getElementById('cam1-select').onclick = function() {
+       cam_hide1 = true;
+       cam_hide2 = false;
+       cam_hide3 = false;
+       cam_hide4 = false;
+       cam_hide5 = false;  
+
+       if (cam_hide1){
+           document.getElementById('cam1-settings').style.display = 'block'; //Show
+           document.getElementById('cam2-settings').style.display = 'none'; //Hide
+           document.getElementById('cam3-settings').style.display = 'none'; //Hide
+           document.getElementById('cam4-settings').style.display = 'none'; //Hide
+           document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+        }
+     
+       
+    }
+    
+    document.getElementById('cam2-select').onclick = function() {
+
+       cam_hide1 = false;
+       cam_hide2 = true;
+       cam_hide3 = false;
+       cam_hide4 = false;
+       cam_hide5 = false;
+
+       if (cam_hide2){
+           document.getElementById('cam1-settings').style.display = 'none'; //Hide
+           document.getElementById('cam2-settings').style.display = 'block'; //Show
+           document.getElementById('cam3-settings').style.display = 'none'; //Hide
+           document.getElementById('cam4-settings').style.display = 'none'; //Hide
+           document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+        } 
+    }
+
+    document.getElementById('cam3-select').onclick = function() {
+       cam_hide1 = false;
+       cam_hide2 = false;
+       cam_hide3 = true;
+       cam_hide4 = false;
+       cam_hide5 = false;
+        
+       if (cam_hide3){
+           document.getElementById('cam1-settings').style.display = 'none'; //Hide
+           document.getElementById('cam2-settings').style.display = 'none'; //Hide
+           document.getElementById('cam3-settings').style.display = 'block'; //Show
+           document.getElementById('cam4-settings').style.display = 'none'; //Hide
+           document.getElementById('cam5-settings').style.display = 'none'; //Hide 
+        } 
+       
+    }
+    document.getElementById('cam4-select').onclick = function() {
+       cam_hide1 = false;
+       cam_hide2 = false;
+       cam_hide3 = false;
+       cam_hide4 = true;
+       cam_hide5 = false; 
+       if (cam_hide4){
+           document.getElementById('cam1-settings').style.display = 'none'; //Hide
+           document.getElementById('cam2-settings').style.display = 'none'; //Hide
+           document.getElementById('cam3-settings').style.display = 'none'; //Hide
+           document.getElementById('cam4-settings').style.display = 'block'; //Show
+           document.getElementById('cam5-settings').style.display = 'none'; //Hide  
+        }
+    }
+
+    document.getElementById('cam5-select').onclick = function() {
+       cam_hide1 = false;
+       cam_hide2 = false;
+       cam_hide3 = false;
+       cam_hide4 = false;
+       cam_hide5 = true;
+       if (cam_hide5){
+           document.getElementById('cam1-settings').style.display = 'none'; //Hide
+           document.getElementById('cam2-settings').style.display = 'none'; //Hide
+           document.getElementById('cam3-settings').style.display = 'none'; //Hide
+           document.getElementById('cam4-settings').style.display = 'none'; //Hide
+           document.getElementById('cam5-settings').style.display = 'block'; //Show 
+        }
+    }
+
+
+    */
+    
+    
+
+    
+
+    
+
+    
+    
+</script>

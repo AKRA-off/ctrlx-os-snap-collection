@@ -1,0 +1,44 @@
+<html>
+
+<head>
+  <link href="{{url_for('static', filename='bootstrap/bootstrap.min.css')}}" rel="stylesheet"
+    id="bootstrap-css">
+  <script src="{{url_for('static', filename='bootstrap/bootstrap.min.js')}}"></script>
+  <script src="{{url_for('static', filename='bootstrap/jquery.min.js')}}"></script>
+  <link rel="stylesheet" href="{{url_for('static', filename='bootstrap/login.css')}}">
+</head>
+
+
+<div class="wrapper fadeInDown">
+  {% if 'error' in result %}
+  <div class="alert alert-danger" role="alert">
+    Invalid Credentials
+  </div>
+  {% endif %}
+
+<!--   <div
+    class="bg-image"
+    style="
+      background-image: url('static/img/service.jpg');
+      height: 100vh;
+    "
+  ></div>   -->
+
+  <div id="formContent" class="form-control" value="#000000">
+    <div class="form-control" value="#f7e7e7">
+        <div class="fadeIn first">
+          <img src="{{url_for('static', filename='image/rexroth.png')}}" class="img-responsive logo" />
+        </div>
+      _______________________________________________
+        <!-- Login Form -->
+        <form method="post" action="../login_post">
+          <input type="text" id="login" class="fadeIn second" name="email" placeholder="username"><br>
+          <input type="password" id="password" class="fadeIn third" name="password" placeholder="password">
+          <input type="submit" class="fadeIn fourth" value="Log In">
+        </form>
+        <div>
+            <a class="underlineHover" href="#">2025 Bosch Rexroth VN</a>
+        </div>
+    </div>
+  </div>
+</div>

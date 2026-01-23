@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Semantic Robot Description Format (SRDF) for KR810 + RG2 Gripper
+  This file defines planning groups, poses, end effectors, and collision checking
+-->
+<robot name="kr810_rg2">
+
+  <!-- Planning Groups -->
+
+  <!-- KR810 Arm Group (7 DOF) -->
+  <group name="kr810_arm">
+    <joint name="joint_1"/>
+    <joint name="joint_2"/>
+    <joint name="joint_3"/>
+    <joint name="joint_4"/>
+    <joint name="joint_5"/>
+    <joint name="joint_6"/>
+    <joint name="joint_7"/>
+  </group>
+
+  <!-- RG2 Gripper Group -->
+  <group name="rg2_gripper">
+    <joint name="left_finger_joint"/>
+    <joint name="right_finger_joint"/>
+  </group>
+
+  <!-- Combined Group (Arm + Gripper) -->
+  <group name="kr810_rg2">
+    <group name="kr810_arm"/>
+    <group name="rg2_gripper"/>
+  </group>
+
+  <!-- End Effector Definition -->
+  <end_effector name="rg2" parent_link="end_effector" group="rg2_gripper" parent_group="kr810_arm"/>
+
+  <!-- Named Poses for KR810 Arm -->
+
+  <!-- Ready/Home position -->
+  <group_state name="ready" group="kr810_arm">
+    <joint name="joint_1" value="0.0"/>
+    <joint name="joint_2" value="-0.785"/>
+    <joint name="joint_3" value="0.0"/>
+    <joint name="joint_4" value="-1.57"/>
+    <joint name="joint_5" value="0.0"/>
+    <joint name="joint_6" value="0.0"/>
+    <joint name="joint_7" value="0.0"/>
+  </group_state>
+
+  <!-- Extended/Reach position -->
+  <group_state name="extended" group="kr810_arm">
+    <joint name="joint_1" value="0.0"/>
+    <joint name="joint_2" value="0.0"/>
+    <joint name="joint_3" value="0.0"/>
+    <joint name="joint_4" value="0.0"/>
+    <joint name="joint_5" value="0.0"/>
+    <joint name="joint_6" value="0.0"/>
+    <joint name="joint_7" value="0.0"/>
+  </group_state>
+
+  <!-- Named Poses for RG2 Gripper -->
+
+  <!-- Gripper open - 50mm width (reverted to working state) -->
+  <group_state name="open" group="rg2_gripper">
+    <joint name="left_finger_joint" value="0.11"/>
+    <joint name="right_finger_joint" value="-0.11"/>
+  </group_state>
+
+  <!-- Gripper closed (grasping) -->
+  <group_state name="close" group="rg2_gripper">
+    <joint name="left_finger_joint" value="0.01"/>
+    <joint name="right_finger_joint" value="-0.01"/>
+  </group_state>
+
+  <!-- Half open position -->
+  <group_state name="half_open" group="rg2_gripper">
+    <joint name="left_finger_joint" value="0.0275"/>
+    <joint name="right_finger_joint" value="-0.0275"/>
+  </group_state>
+
+  <!-- Disable Collision Checking Between These Links -->
+
+  <!-- Adjacent links in kinematic chain don't need collision checking -->
+  <disable_collisions link1="base" link2="link1" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="linkJ2" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link2" reason="Adjacent"/>
+  <disable_collisions link1="linkJ2" link2="link2" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link3" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="linkJ4" reason="Adjacent"/>
+  <disable_collisions link1="linkJ4" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="linkJ6" reason="Adjacent"/>
+  <disable_collisions link1="linkJ6" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link6" link2="end_effector" reason="Adjacent"/>
+  <disable_collisions link1="end_effector" link2="rg2_hand" reason="Adjacent"/>
+  <disable_collisions link1="rg2_hand" link2="left_finger" reason="Adjacent"/>
+  <disable_collisions link1="rg2_hand" link2="right_finger" reason="Adjacent"/>
+  <disable_collisions link1="left_finger" link2="right_finger" reason="Never"/>
+
+  <!-- Disable collisions between non-adjacent but never-colliding links -->
+  <disable_collisions link1="base" link2="link2" reason="Never"/>
+  <disable_collisions link1="base" link2="link3" reason="Never"/>
+  <disable_collisions link1="base" link2="link4" reason="Never"/>
+  <disable_collisions link1="link1" link2="link3" reason="Never"/>
+  <disable_collisions link1="link1" link2="link4" reason="Never"/>
+  <disable_collisions link1="link2" link2="linkJ4" reason="Never"/>
+  <disable_collisions link1="link2" link2="link4" reason="Never"/>
+  <disable_collisions link1="link3" link2="link4" reason="Never"/>
+  <disable_collisions link1="link4" link2="linkJ6" reason="Never"/>
+  <disable_collisions link1="link4" link2="link6" reason="Never"/>
+  <disable_collisions link1="link5" link2="link6" reason="Never"/>
+  <disable_collisions link1="link5" link2="end_effector" reason="Never"/>
+
+  <!-- Disable collisions between gripper and far arm links -->
+  <disable_collisions link1="left_finger" link2="link1" reason="Never"/>
+  <disable_collisions link1="left_finger" link2="link2" reason="Never"/>
+  <disable_collisions link1="left_finger" link2="link3" reason="Never"/>
+  <disable_collisions link1="left_finger" link2="link4" reason="Never"/>
+  <disable_collisions link1="right_finger" link2="link1" reason="Never"/>
+  <disable_collisions link1="right_finger" link2="link2" reason="Never"/>
+  <disable_collisions link1="right_finger" link2="link3" reason="Never"/>
+  <disable_collisions link1="right_finger" link2="link4" reason="Never"/>
+
+  <!-- Virtual Joint (for fixing robot to world) -->
+  <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="world"/>
+
+</robot>

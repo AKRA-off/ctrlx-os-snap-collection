@@ -1,0 +1,36 @@
+home_position:
+  gripper_close_width: 0.05000000000000004
+  joints:
+    joint_1: -1.639554432448038
+    joint_2: 0.2575253244734993
+    joint_3: 0.20241280382603646
+    joint_4: 2.5229801047656086
+    joint_5: 2.88131860587971
+    joint_6: -0.43236590468607944
+    joint_7: -4.364342285574174
+    left_finger_joint: 0.0
+  timestamp: 1766559928.7675707
+pick_position:
+  gripper_close_width: 0.05000000000000004
+  joints:
+    joint_1: -1.448216722813223
+    joint_2: 0.5261706861798625
+    joint_3: 0.10092318787349311
+    joint_4: 2.3837462631531254
+    joint_5: 2.7971627384813633
+    joint_6: -0.3088142443248252
+    joint_7: -4.1893046540156424
+    left_finger_joint: 0.0
+  timestamp: 1766559914.347812
+place_position:
+  gripper_close_width: 0.05000000000000004
+  joints:
+    joint_1: -1.682457938575568
+    joint_2: 0.5121610491630088
+    joint_3: 0.12044579694915945
+    joint_4: 2.34363703855422
+    joint_5: 2.783033946156835
+    joint_6: -0.35509978386964774
+    joint_7: -4.3975635359480965
+    left_finger_joint: 0.0
+  timestamp: 1766559922.0470746

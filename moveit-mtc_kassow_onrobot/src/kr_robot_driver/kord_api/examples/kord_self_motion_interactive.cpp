@@ -1,0 +1,184 @@
+#include <chrono>
+#include <cmath>
+#include <csignal>
+#include <iostream>
+#include <thread>
+
+#define NCURSES_NOMACROS
+#include <ncurses.h>
+
+#include <kord/api/kord.h>
+#include <kord/api/kord_control_interface.h>
+#include <kord/api/kord_receive_interface.h>
+#include <kord/utils/utils.h>
+
+using namespace kr2;
+static std::atomic<bool> g_run = true;
+
+std::atomic<double> speed;
+
+void signal_handler(int a_signum)
+{
+    psignal(a_signum, "[KORD-API]");
+    g_run = false;
+}
+
+void read_keys()
+{
+    initscr();            // Initialize the ncurses library
+    raw();                // Disable line buffering
+    keypad(stdscr, TRUE); // Enable special keys, like arrow keys
+    noecho();             // Do not display pressed keys
+    timeout(10);          // Set a timeout of 50 milliseconds
+
+    printw("\nPress left and right arrow keys to enable self-motion. Press 'q' to quit.");
+
+    int ch;
+    int not_pressed_counter = 0;
+    double current_speed = 0; // Track the current speed to avoid unnecessary updates
+
+    while (g_run) {
+        ch = getch();
+        if (ch != ERR) {
+            switch (ch) {
+            case KEY_LEFT: {
+                current_speed = -0.5;
+                not_pressed_counter = 0;
+                break;
+            }
+            case KEY_RIGHT: {
+                current_speed = 0.5;
+                not_pressed_counter = 0;
+                break;
+            }
+            case 'q': {
+                g_run = false;
+                break;
+            }
+            default: {
+                not_pressed_counter += 1;
+                break;
+            }
+            }
+        }
+        else {
+            // No key is pressed
+            not_pressed_counter += 1;
+        }
+
+        // Update speed only if a key is pressed; otherwise, reset speed to 0
+        if (not_pressed_counter > 50)
+            speed = 0;
+        else
+            speed = current_speed;
+
+        refresh();
+    }
+
+    endwin(); // End the ncurses mode
+}
+
+int main(int argc, char *argv[])
+{
+    utils::LaunchParameters lp = utils::LaunchParameters::processLaunchArguments(argc, argv);
+
+    if (lp.help_ || !lp.valid_) {
+        return EXIT_SUCCESS;
+    }
+
+    signal(SIGINT, signal_handler);
+
+    if (lp.useRealtime()) {
+        if (!utils::realtime::init_realtime_params(lp.rt_prio_)) {
+            KORD_LOG_ERROR("Failed to start with realtime priority");
+            utils::LaunchParameters::printUsage(true);
+            return EXIT_FAILURE;
+        }
+    }
+
+    KORD_LOG_INFO("Connecting to: " << lp.remote_controller_ << ":" << lp.port_);
+    KORD_LOG_INFO("Session ID: " << lp.session_id_);
+
+    std::shared_ptr<kord::KordCore> kord(
+        new kord::KordCore(lp.remote_controller_, lp.port_, lp.session_id_, kord::UDP_CLIENT));
+
+    kord::ControlInterface ctl_iface(kord);
+    kord::ReceiverInterface rcv_iface(kord);
+
+    if (!kord->connect()) {
+        KORD_LOG_ERROR("Connecting to KR failed");
+        return EXIT_FAILURE;
+    }
+
+    g_run = true;
+
+    // Obtain initial q values
+    if (!kord->syncRC()) {
+        KORD_LOG_ERROR("Sync RC failed.");
+        return EXIT_FAILURE;
+    }
+
+    KORD_LOG_INFO("Sync Captured");
+    rcv_iface.fetchData();
+    if (rcv_iface.systemAlarmState()) {
+        // notify alarm
+        KORD_LOG_ERROR("System alart state - cannot continue");
+        return EXIT_FAILURE;
+    }
+
+    std::array<double, 7UL> start_q = rcv_iface.getJoint(kord::ReceiverInterface::EJointValue::S_ACTUAL_Q);
+
+    std::string initial_j_conf = "Initial joint configuration: ";
+    for (double angl : start_q)
+        initial_j_conf += std::to_string(angl / 3.14 * 180) + " ";
+    KORD_LOG_INFO(initial_j_conf);
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    auto read_thread = std::thread([]() { read_keys(); });
+
+    while (g_run) {
+        if (!kord->waitSync(std::chrono::milliseconds(10))) {
+            KORD_LOG_ERROR("Sync wait timed out, exit");
+            break;
+        }
+        ctl_iface.moveManifold(speed);
+
+        rcv_iface.fetchData();
+        if (rcv_iface.systemAlarmState() || lp.runtimeElapsed()) {
+            break;
+        }
+    }
+
+    KORD_LOG_INFO("Robot stopped");
+    KORD_LOG_INFO(rcv_iface.getFormattedInputBits());
+    KORD_LOG_INFO(rcv_iface.getFormattedOutputBits());
+    KORD_LOG_INFO("SystemAlarmState: ");
+    KORD_LOG_INFO(rcv_iface.systemAlarmState());
+    switch (rcv_iface.systemAlarmState() & 0b1111) {
+    case kr2::kord::protocol::EEventGroup::eUnknown:
+        KORD_LOG_INFO("No alarms");
+        break;
+    case kr2::kord::protocol::EEventGroup::eSafetyEvent:
+        KORD_LOG_INFO("Safety Event");
+        break;
+    case kr2::kord::protocol::EEventGroup::eSoftStopEvent:
+        KORD_LOG_INFO("Soft Stop Event");
+        break;
+    case kr2::kord::protocol::EEventGroup::eKordEvent:
+        KORD_LOG_INFO("KORD Event");
+        break;
+    }
+
+    KORD_LOG_INFO("Safety flags: " << rcv_iface.getRobotSafetyFlags());
+    auto end_time = std::chrono::steady_clock::now();
+    double runtime_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start).count() / 1000.0;
+    KORD_LOG_INFO("Runtime: " << runtime_seconds << " [s]");
+    KORD_LOG_INFO("SafetyFlags: " << rcv_iface.getRobotSafetyFlags());
+    KORD_LOG_INFO("MotionFlags: " << rcv_iface.getMotionFlags());
+    KORD_LOG_INFO("RCState: " << rcv_iface.getRobotSafetyFlags());
+
+    kord->printStats(rcv_iface.getStatisticsStructure());
+
+    read_thread.join();
+    return 0;
+}

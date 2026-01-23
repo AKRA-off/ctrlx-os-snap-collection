@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="kr810">
+
+  <!-- Import kr810 macro -->
+  <xacro:include filename="$(find kr_robot_description)/kr810/urdf/kr810_description.urdf.xacro"/>
+  <xacro:kr810_description/>
+
+  <!-- Import r6bot ros2_control description -->
+  <xacro:include filename="$(find kr_robot_driver)/ros2_control/kr810.ros2_control.xacro" />
+  <xacro:kr810_ros2_control name="kr810"/>
+
+</robot>

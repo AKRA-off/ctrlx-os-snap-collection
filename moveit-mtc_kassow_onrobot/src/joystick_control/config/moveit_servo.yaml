@@ -1,0 +1,64 @@
+# MoveIt Servo configuration
+use_gazebo: false
+
+# QoS overrides
+qos_overrides:
+  /kr810_arm_controller/joint_trajectory:
+    publisher:
+      reliability: best_effort
+      durability: volatile
+
+## Properties of incoming commands
+command_in_type: "speed_units"  # Commands in m/s and rad/s
+scale:
+  linear: 1.0
+  rotational: 1.0
+  joint: 1.0
+
+## Properties
+publish_period: 0.02  # 50 Hz
+low_latency_mode: false
+
+# Command output type
+command_out_type: trajectory_msgs/JointTrajectory
+publish_joint_positions: true
+publish_joint_velocities: true
+publish_joint_accelerations: false
+
+## Smoothing filter
+smoothing_filter_plugin_name: "online_signal_smoothing::ButterworthFilterPlugin"
+
+# Planning scene
+is_primary_planning_scene_monitor: false  # move_group is primary
+
+## MoveIt properties
+move_group_name: kr810_arm
+planning_frame: base
+
+## Frames
+ee_frame_name: rg2_hand
+robot_link_command_frame: base
+
+## Stopping behaviour
+incoming_command_timeout: 0.1
+num_outgoing_halt_msgs_to_publish: 4
+
+## Singularities and limits
+lower_singularity_threshold: 30.0
+hard_stop_singularity_threshold: 45.0
+joint_limit_margin: 0.1
+leaving_singularity_threshold_multiplier: 2.0
+
+## Topic names
+cartesian_command_in_topic: ~/delta_twist_cmds
+joint_command_in_topic: ~/delta_joint_cmds
+joint_topic: /joint_states
+status_topic: ~/status
+command_out_topic: /kr810_arm_controller/joint_trajectory
+
+## Collision checking
+check_collisions: false  # Disabled for manual control
+collision_check_rate: 10.0
+self_collision_proximity_threshold: 0.01
+scene_collision_proximity_threshold: 0.02
+

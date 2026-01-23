@@ -1,0 +1,7 @@
+joystick_teleop_node:
+  ros__parameters:
+    linear_max_velocity: 0.1      # m/s (10 cm/s)
+    angular_max_velocity: 0.5     # rad/s (~28 deg/s)
+    deadzone: 0.1                 # 10% deadzone for stick drift
+    update_rate: 50.0             # Hz
+    enable_servo: true

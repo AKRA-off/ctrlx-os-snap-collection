@@ -1,0 +1,98 @@
+# OMPL Planning Configuration for KR810 + RG2
+# This file configures the OMPL planning plugin and defines which planners can be used
+# for motion planning with the Kassow KR810 robot arm and RG2 gripper.
+
+planning_plugin: ompl_interface/OMPLPlanner
+
+# Request adapters process the planning request and response
+# AddTimeOptimalParameterization: Adds velocity/acceleration constraints from joint_limits.yaml
+request_adapters: >-
+  default_planner_request_adapters/AddTimeOptimalParameterization
+  default_planner_request_adapters/ResolveConstraintFrames
+  default_planner_request_adapters/FixWorkspaceBounds
+  default_planner_request_adapters/FixStartStateBounds
+  default_planner_request_adapters/FixStartStateCollision
+  default_planner_request_adapters/FixStartStatePathConstraints
+
+# Maximum allowed error for start state bounds
+start_state_max_bounds_error: 0.1
+
+# Planner configurations - defining the OMPL planners available
+planner_configs:
+  # RRTConnect: Fast bidirectional RRT - good default choice
+  RRTConnectkConfigDefault:
+    type: geometric::RRTConnect
+    range: 0.0  # Auto-configured based on state space
+
+  # RRT: Basic rapidly-exploring random tree
+  RRTkConfigDefault:
+    type: geometric::RRT
+    range: 0.0
+    goal_bias: 0.05
+
+  # RRT*: Asymptotically optimal version of RRT
+  RRTstarkConfigDefault:
+    type: geometric::RRTstar
+    range: 0.0
+    goal_bias: 0.05
+    delay_collision_checking: 1
+
+  # PRM: Probabilistic roadmap - good for repeated queries
+  PRMkConfigDefault:
+    type: geometric::PRM
+    max_nearest_neighbors: 10
+
+  # PRM*: Asymptotically optimal PRM
+  PRMstarkConfigDefault:
+    type: geometric::PRMstar
+
+  # LBKPIECE: Grid-based planner with sampling
+  LBKPIECEkConfigDefault:
+    type: geometric::LBKPIECE
+    range: 0.0
+    border_fraction: 0.9
+    min_valid_path_fraction: 0.5
+
+  # KPIECE: Kinodynamic motion planning
+  KPIECEkConfigDefault:
+    type: geometric::KPIECE
+    range: 0.0
+    goal_bias: 0.05
+    border_fraction: 0.9
+    failed_expansion_score_factor: 0.5
+    min_valid_path_fraction: 0.5
+
+# Planning group configurations
+# Each group specifies which planners can be used for that group
+kr810_arm:
+  default_planner_config: RRTConnectkConfigDefault
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTkConfigDefault
+    - RRTstarkConfigDefault
+    - PRMkConfigDefault
+    - PRMstarkConfigDefault
+    - LBKPIECEkConfigDefault
+    - KPIECEkConfigDefault
+
+rg2_gripper:
+  default_planner_config: RRTConnectkConfigDefault
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTkConfigDefault
+    - RRTstarkConfigDefault
+    - PRMkConfigDefault
+    - PRMstarkConfigDefault
+    - LBKPIECEkConfigDefault
+    - KPIECEkConfigDefault
+
+kr810_rg2:
+  default_planner_config: RRTConnectkConfigDefault
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTkConfigDefault
+    - RRTstarkConfigDefault
+    - PRMkConfigDefault
+    - PRMstarkConfigDefault
+    - LBKPIECEkConfigDefault
+    - KPIECEkConfigDefault

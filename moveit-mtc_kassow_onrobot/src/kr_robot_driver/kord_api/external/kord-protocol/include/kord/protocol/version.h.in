@@ -1,0 +1,20 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// (C) Copyright 2024 by Kassow Robots, ApS
+//
+// The information contained herein is confidential, proprietary to Kassow Robots,
+// ApS, and considered a trade secret as defined in section 263 and section 264
+// under the Danish Criminal Code. Use of this information by anyone
+// other than authorized employees of Kassow Robots, ApS is granted only under a
+// written non-disclosure agreement, expressly prescribing the scope and
+// manner of such use.
+//
+/////////////////////////////////////////////////////////////////////////////
+
+#ifndef KR2_KORD_PROTOCOL_VERSION_H
+#define KR2_KORD_PROTOCOL_VERSION_H
+
+#define PROTOCOL_VERSION "@GIT_VERSION@"
+#define PROTOCOL_SHA1 "@GIT_SHA1@"
+
+#endif
