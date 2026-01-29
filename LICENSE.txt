@@ -6,7 +6,7 @@ Products of Bosch Rexroth AG Free of Charge" supplemented by the right to redist
 
 MIT License
 
-Copyright (c) 2024-2025 Bosch Rexroth AG
+Copyright (c) 2024-2026 Akra
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
