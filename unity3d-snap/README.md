@@ -33,5 +33,5 @@ ___
 
 ## License
 
-SPDX-FileCopyrightText: Bosch Rexroth AG
+SPDX-FileCopyrightText: Akra
 SPDX-License-Identifier: MIT
