@@ -1,8 +1,8 @@
-# Ctrlx YOLOv8 Instance Segmentation with ONNX and HEF models
+# ctrlX YOLOv8 Instance Segmentation with ONNX and HEF models
 
 ## Introduction
 
-The sample demonstrates how to connect Hikrobot and usb web cameras to CtrlX Core, take a picture and execute inference based on preloaded model. The results of output boxes, scores and classes are stored in the Datalayer of the Core. 
+The sample demonstrates how to connect Hikrobot and usb web cameras to ctrlX CORE, take a picture and execute inference based on preloaded model. The results of output boxes, scores and classes are stored in the Datalayer of the Core. 
 
 ## Function Description
 
@@ -13,7 +13,7 @@ Program has a webpage to choose between preloaded image, USB and Hik cameras, co
 The module __main.py__ contains Flask webserver, interface to connect cameras and run inference, Datalayer Provider and Client functions
 __snap__ including snapcraft.yaml and required hooks
 __dependencies__ with Flask files, models and configurations
-__configs__ with script for folder creation and integration in the CtrlX side bar
+__configs__ with script for folder creation and integration in the ctrlX side bar
 __MVImport__ adding Hikrobot header files
 __helper__ dependencies for Datalayer
 __yoloseg__ for using ONNX models
@@ -22,7 +22,7 @@ __setup.py__
 
 ## Build
 
-Beware, the source code is designed for CtrlX Core X3 with arm64 architecture, for the devices with amd64 architecture snapcraft.yaml, MVImport and libraries of Hikrobot must be changed.
+Beware, the source code is designed for ctrlX CORE X3 with arm64 architecture, for the devices with amd64 architecture snapcraft.yaml, MVImport and libraries of Hikrobot must be changed.
 Download the source code and build the snap executing .sh script depending on your architecture or run command directly:
 
 ```shell
