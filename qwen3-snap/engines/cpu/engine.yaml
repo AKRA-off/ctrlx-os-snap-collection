@@ -1,0 +1,20 @@
+name: cpu
+summary: CPU-optimized for workstations
+vendor: Canonical Ltd
+devices:
+  anyof:
+    - type: cpu
+      architecture: amd64
+    - type: cpu
+      architecture: arm64
+
+runtime: llamacpp
+
+model:
+  default: qwen3-0-6b
+  options:
+    - qwen3-0-6b
+
+configurations:
+  sleep-idle-seconds: 600
+  min-context-size: 1024 

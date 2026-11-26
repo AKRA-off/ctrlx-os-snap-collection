@@ -1,0 +1,32 @@
+# This workflow is used to build and publish the snap to the store on every push to main.
+name: CICD
+
+on:
+  push:
+    branches:
+      - main
+  
+  workflow_dispatch: # manual trigger 
+
+
+# Keep one CICD run active at a time so publish/test/promote happen in order
+concurrency:
+  group: ${{ github.workflow }}
+  queue: max
+
+jobs:
+  cicd:
+    if: github.repository == 'canonical/qwen3-snap' # do not run on forks
+    uses: canonical/inference-snaps-dev/.github/workflows/reuse-cicd.yaml@v2
+    with:
+      build-runner: |
+        [
+          ["amd64", "medium", "noble", "self-hosted"],
+          ["arm64", "large", "noble", "self-hosted"]
+        ]
+      store-track: latest
+      snap-name: qwen3
+      smoke-test-engine: cpu
+      smoke-test-features: openai_models, openai_chat_text
+    secrets:
+      store-credentials: ${{ secrets.STORE_LOGIN_MAIN }}

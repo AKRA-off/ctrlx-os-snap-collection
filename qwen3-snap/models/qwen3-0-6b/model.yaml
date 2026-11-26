@@ -1,0 +1,20 @@
+name: qwen3-0-6b
+quantization: Q4_K_M
+disk-size: 484M
+
+description: |
+  Qwen3 0.6B is a compact language model with 0.6B parameters.
+  This variant uses Q4_K_M quantization.
+
+model-card-url: https://huggingface.co/Qwen/Qwen3-0.6B
+
+capabilities:
+  - text
+  - thinking
+  - tools
+
+components:
+  - model-0-6b-q4-k-m-gguf
+
+environment:
+  - MODEL_FILE=$SNAP_COMPONENTS/model-0-6b-q4-k-m-gguf/qwen3-0.6b-q4_k_m.gguf

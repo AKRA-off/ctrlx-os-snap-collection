@@ -1,0 +1,23 @@
+name: nvidia-gpu
+summary: CUDA optimized for workstation GPUs
+vendor: Canonical Ltd
+devices:
+  allof:
+    - type: gpu
+      vendor-id: 0x10de # Nvidia Corporation
+  anyof:
+    - type: cpu
+      architecture: amd64
+    - type: cpu
+      architecture: arm64
+
+runtime: llamacpp-cuda
+
+model:
+  default: qwen3-8b
+  options:
+    - qwen3-8b
+
+configurations:
+  sleep-idle-seconds: 600
+  min-context-size: 4096

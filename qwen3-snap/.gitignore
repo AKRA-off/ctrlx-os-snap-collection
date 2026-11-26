@@ -1,0 +1,16 @@
+.venv/
+
+# Snap build artifacts
+*.snap
+*.comp
+parts/
+prime/
+stage/
+.craft/
+components/
+
+# Model weight files
+*.gguf
+
+# Dev tools
+dev/

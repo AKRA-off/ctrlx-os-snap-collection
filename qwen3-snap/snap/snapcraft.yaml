@@ -1,0 +1,373 @@
+name: qwen3
+title: Qwen 3
+base: core24
+summary: Local AI with Qwen 3 inference snap
+description: |
+  Qwen 3 is a large language model (LLM) developed by Alibaba. It is designed for various natural language processing tasks, including text generation, summarization, and question answering.
+
+  Use this snap to quickly install an optimized environment for local inference with Qwen 3.
+
+  The snap includes the following hardware-optimized inference engines:
+
+  * cpu: Optimized for x64 and ARM (armv8, armv9) CPUs
+  * nvidia-gpu: CUDA-enabled GPU acceleration
+  * amd-gpu: ROCm-enabled GPU acceleration for AMD GPUs
+  * mediatek-npu: Optimized for MediaTek Genio NPUs
+
+  The most suitable engine is automatically selected based on the available hardware.
+
+  **Install:**
+
+  `sudo snap install qwen3`
+
+  **Run:**
+
+  `qwen3`
+
+  Some accelerators require extra drivers to be usable with this snap:
+  https://documentation.ubuntu.com/inference-snaps/how-to/setup/drivers/
+
+  **License:**
+
+  The Qwen 3 model is provided by Alibaba under the Apache 2.0 license.
+
+  The licenses of all the bundled software can be found after installing the snap at
+  `/snap/qwen3/current/usr/share/doc`.
+
+icon: snap/gui/icon-256.png
+website: https://documentation.ubuntu.com/inference-snaps
+source-code: https://github.com/canonical/qwen3-snap
+issues: https://github.com/canonical/inference-snaps/issues
+
+adopt-info: version
+
+grade: stable
+confinement: strict
+compression: lzo
+
+assumes:
+  - snapd2.68 # for components support
+
+platforms:
+  amd64:
+  arm64:
+
+slots:
+  provider:
+    interface: content
+    content: inference-provider
+    source:
+      read:
+        - $SNAP_COMMON/share/provider
+
+plugs:
+  mediatek-npu-2404:
+    interface: content
+    content: mediatek-npu-2404
+    target: $SNAP/mediatek-npu-2404
+  mediatek-accel:
+    interface: mediatek-accel
+    units: [apu]
+  # To allow side-loading models into server (root daemon) from user home directory
+  home:
+    read: all
+
+environment:
+  SNAP_COMPONENTS: /snap/$SNAP_INSTANCE_NAME/components/$SNAP_REVISION
+  ARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
+
+layout:
+  # Under wsl the libraries are expected in /usr/lib/wsl
+  /usr/lib/wsl:
+    bind: $SNAP_COMMON/usr/lib/wsl
+
+hooks:
+  install:
+    plugs: &install-plugs
+      # For hardware detection
+      - hardware-observe
+      - opengl
+  post-refresh:
+    plugs: *install-plugs
+
+parts:
+  version:
+    after: [cli]
+    plugin: nil
+    source: . # To regenerate the git hash on every change
+    build-packages:
+      - jq
+      - git
+    override-pull: |
+      # Do nothing. This significantly reduces build time when sourcing large files.
+    override-build: |
+      set -eo pipefail
+      cli_version=$($CRAFT_STAGE/bin/modelctl version --format=json | jq .cli --raw-output)
+      git_hash=$(git -C "$SNAPCRAFT_PROJECT_DIR" describe --always)
+      craftctl set version="${cli_version#v}+${git_hash}"
+
+  cli:
+    source:
+      - on amd64: https://github.com/canonical/inference-snaps-cli/releases/download/v2.0.0-beta.17/inference-snaps-cli-linux-amd64.tar.xz
+      - on arm64: https://github.com/canonical/inference-snaps-cli/releases/download/v2.0.0-beta.17/inference-snaps-cli-linux-arm64.tar.xz
+    plugin: dump
+    override-build: |
+      # For tab completion
+      ln --symbolic ./modelctl bin/qwen3
+
+      craftctl default
+    
+  cli-lspci:
+    plugin: nil
+    stage-packages:
+      - pciutils # lspci
+
+  # Used for NVIDIA vRAM and CUDA Capability detection.
+  # Only the binary is included to avoid staging libraries, which should instead be provided by the host through the opengl interface.
+  cli-nvidia-smi:
+    plugin: nil
+    build-packages:
+      - nvidia-utils-580
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/usr/bin
+      cp /usr/bin/nvidia-smi $CRAFT_PART_INSTALL/usr/bin/
+      
+      license_dir=$CRAFT_PART_INSTALL/usr/share/doc/nvidia-utils-580/
+      mkdir -p $license_dir
+      cp /usr/share/doc/nvidia-utils-580/copyright $license_dir/
+
+  webui:
+    plugin: dump
+    source: https://github.com/canonical/inference-snaps-webui/releases/download/v1.1.0/inference-snaps-webui.tar.xz
+    organize:
+      "*": webui/
+
+  engines:
+    source: engines
+    plugin: dump
+    organize:
+      "*": engines/
+
+  models:
+    source: models
+    plugin: dump
+    organize:
+      "*": models/
+
+  runtimes:
+    source: runtimes
+    plugin: dump
+    organize:
+      "*": runtimes/
+    prime:
+      # The mediatek-llm-proxy runtime's code is built and shipped by the
+      # mediatek-llm-proxy part below, not dumped as raw source here.
+      - -runtimes/mediatek-llm-proxy/model-server
+      - -runtimes/mediatek-llm-proxy/requirements.txt
+      - -runtimes/mediatek-llm-proxy/.venv
+  
+  scripts:
+    source: scripts
+    plugin: dump
+    stage-packages:
+      - jq
+    organize:
+      "server.sh": bin/
+      "server-webui.sh": bin/
+
+  local-component-files:
+    plugin: cmake # an out-of-source plugin to reduce copies on disk
+    source: components
+    override-build: |
+
+      cp -rf --archive --link --no-dereference ${CRAFT_PART_SRC}/* ${CRAFT_PART_INSTALL}
+
+      # MediaTek models should only be included in arm64 builds
+      if [ "$CRAFT_ARCH_BUILD_FOR" != "arm64" ]; then
+        rm -rf ${CRAFT_PART_INSTALL}/model-*-mediatek
+      fi
+    organize:
+      "model-0-6b-q4-k-m-gguf/*": (component/model-0-6b-q4-k-m-gguf) #My adding
+      "model-8b-q4-k-m-gguf/*": (component/model-8b-q4-k-m-gguf)
+      "model-0-6b-mediatek/*": (component/model-0-6b-mediatek)
+      "model-1-7b-mediatek/*": (component/model-1-7b-mediatek)
+      "model-4b-mediatek/config.yaml": (component/model-4b-mediatek-1-of-2)/config.yaml
+      "model-4b-mediatek/tokenizer/vocab.txt": (component/model-4b-mediatek-1-of-2)/tokenizer/vocab.txt
+      "model-4b-mediatek/tokenizer/merges.txt": (component/model-4b-mediatek-1-of-2)/tokenizer/merges.txt
+      "model-4b-mediatek/tokenizer/added_tokens.yaml": (component/model-4b-mediatek-1-of-2)/tokenizer/added_tokens.yaml
+      "model-4b-mediatek/tokenizer/embedding_int16.bin": (component/model-4b-mediatek-1-of-2)/tokenizer/embedding_int16.bin
+      "model-4b-mediatek/2048c/shared_weights_0.bin": (component/model-4b-mediatek-1-of-2)/2048c/shared_weights_0.bin
+      "model-4b-mediatek/2048c/dynamic_tflite_output_128t2048c_0.dla": (component/model-4b-mediatek-2-of-2)/2048c/dynamic_tflite_output_128t2048c_0.dla
+      "model-4b-mediatek/2048c/dynamic_tflite_output_128t2048c_0_shared.dla": (component/model-4b-mediatek-2-of-2)/2048c/dynamic_tflite_output_128t2048c_0_shared.dla
+      "model-4b-mediatek/2048c/dynamic_tflite_output_1t2048c_0.dla": (component/model-4b-mediatek-2-of-2)/2048c/dynamic_tflite_output_1t2048c_0.dla
+      "model-4b-mediatek/2048c/dynamic_tflite_output_1t2048c_0_shared.dla": (component/model-4b-mediatek-2-of-2)/2048c/dynamic_tflite_output_1t2048c_0_shared.dla
+      "model-8b-mediatek/config.yaml": (component/model-8b-mediatek-1-of-2)/config.yaml
+      "model-8b-mediatek/tokenizer/vocab.txt": (component/model-8b-mediatek-1-of-2)/tokenizer/vocab.txt
+      "model-8b-mediatek/tokenizer/merges.txt": (component/model-8b-mediatek-1-of-2)/tokenizer/merges.txt
+      "model-8b-mediatek/tokenizer/added_tokens.yaml": (component/model-8b-mediatek-1-of-2)/tokenizer/added_tokens.yaml
+      "model-8b-mediatek/tokenizer/embedding_int16.bin": (component/model-8b-mediatek-1-of-2)/tokenizer/embedding_int16.bin
+      "model-8b-mediatek/2048c/dynamic_tflite_output_1t2048c_0.dla": (component/model-8b-mediatek-1-of-2)/2048c/dynamic_tflite_output_1t2048c_0.dla
+      "model-8b-mediatek/2048c/dynamic_tflite_output_128t2048c_0.dla": (component/model-8b-mediatek-2-of-2)/2048c/dynamic_tflite_output_128t2048c_0.dla
+
+    prime:
+      # Exclude everything not explicitly organized
+      - -*
+
+  llamacpp:
+    plugin: dump
+    source: 
+      - on amd64: https://github.com/canonical/llama.cpp-builds/releases/download/b9482/llamacpp-amd64.tar.gz
+      - on arm64: https://github.com/canonical/llama.cpp-builds/releases/download/b9482/llamacpp-arm64.tar.gz
+    stage-packages:
+      - libgomp1
+    organize:
+      "licenses": usr/share/doc/llama.cpp # Add licenses to the snap
+      "*": (component/llamacpp)
+    
+  #llamacpp-cuda:
+  #  plugin: dump
+  #  source: 
+  #    - on amd64: https://github.com/canonical/llama.cpp-builds/releases/download/b9482/llamacpp-amd64+cuda12.9.tar.gz
+  #    - on arm64: https://github.com/canonical/llama.cpp-builds/releases/download/b9482/llamacpp-arm64+cuda12.9.tar.gz
+  #  stage-packages:
+  #    - libgomp1
+  #  organize:
+  #    "licenses": usr/share/doc/llama.cpp+cuda # Add licenses to the snap
+  #    "*": (component/llamacpp-cuda)
+
+  #llamacpp-rocm:
+  #  plugin: dump
+  #  source: https://github.com/canonical/llama.cpp-builds/releases/download/b9482/llamacpp-amd64+rocm.tar.gz
+  #  stage-packages:
+  #    - libgomp1
+  #    - libatomic1
+  #  organize:
+  #    "licenses": usr/share/doc/llama.cpp+rocm # Add licenses to the snap
+ #     "*": (component/llamacpp-rocm)
+ #   # This part is only for amd64
+ #   override-pull: &amd64-only |
+ #     [ "$CRAFT_ARCH_BUILD_FOR" == "amd64" ] && craftctl default || exit 0
+ #   override-build: *amd64-only
+ #   override-stage: *amd64-only
+ #   override-prime: *amd64-only
+
+  mediatek-llm-proxy:
+    plugin: python
+    source: runtimes/mediatek-llm-proxy
+    python-requirements:
+      - requirements.txt
+    override-build: |
+      # Only include this part for arm64 builds
+      if [ "$CRAFT_ARCH_BUILD_FOR" != "arm64" ]; then
+        exit 0
+      fi
+
+      craftctl default
+      install -Dm644 -t $CRAFT_PART_INSTALL/model-server $CRAFT_PART_BUILD/model-server/*
+    organize:
+      "*": (component/mediatek-llm-proxy)
+
+  notice:
+    plugin: nil
+    source: NOTICE
+    source-type: file
+    override-build: |
+      license_dir=$CRAFT_PART_INSTALL/usr/share/doc
+      mkdir -p $license_dir
+      cp NOTICE $license_dir/
+      cp $SNAPCRAFT_PROJECT_DIR/LICENSE $license_dir/
+      cp $SNAPCRAFT_PROJECT_DIR/LICENSE-qwen3 $license_dir/
+  
+  #model-0-6b-q4-k-m-gguf: ##My adding
+  #  plugin: dump
+  #  source: ./models/qwen3-0-6b
+  #  organize:
+  #    '*': (component/model-0-6b-q4-k-m-gguf)/
+
+components:
+  model-0-6b-q4-k-m-gguf: ##My adding
+    type: standard
+    summary: Qwen3 0.6B Q4_K_M GGUF
+    description: Model weights for Qwen3 0.6B in GGUF format
+  model-8b-q4-k-m-gguf:
+    type: standard
+    summary: Qwen 3 8B Q4_K_M GGUF
+    description: Model weights for Qwen 3 8B in GGUF format
+  model-0-6b-mediatek:
+    type: standard
+    summary: MediaTek optimized Qwen3 0.6B model for MediaTek Genio NPU
+    description: Model weights for MediaTek optimized Qwen3 0.6B model in DLA format, designed for inference on MediaTek Genio NPU
+  model-1-7b-mediatek:
+    type: standard
+    summary: MediaTek optimized Qwen3 1.7B model for MediaTek Genio NPU
+    description: Model weights for MediaTek optimized Qwen3 1.7B model in DLA format, designed for inference on MediaTek Genio NPU
+  model-4b-mediatek-1-of-2: &model-mediatek-4b
+    type: standard
+    summary: MediaTek optimized Qwen3 4B model for MediaTek Genio NPU
+    description: Model weights for MediaTek optimized Qwen3 4B model in DLA format, designed for inference on MediaTek Genio NPU
+  model-4b-mediatek-2-of-2:
+    <<: *model-mediatek-4b
+  model-8b-mediatek-1-of-2: &model-mediatek-8b
+    type: standard
+    summary: MediaTek optimized Qwen3 8B model for MediaTek Genio NPU
+    description: Model weights for MediaTek optimized Qwen3 8B model in DLA format, designed for inference on MediaTek Genio NPU
+  model-8b-mediatek-2-of-2:
+    <<: *model-mediatek-8b
+
+  llamacpp:
+    type: standard
+    summary: llama.cpp using default CPU instruction sets
+    description: LLM inference in C/C++
+
+  #llamacpp-cuda:
+  #  type: standard
+  #  summary: llama.cpp with CUDA backend
+  #  description: LLM inference in C/C++
+
+  #llamacpp-rocm:
+  #  type: standard
+  #  summary: llama.cpp with ROCm backend
+  #  description: LLM inference in C/C++
+
+  mediatek-llm-proxy:
+    type: standard
+    summary: LLM proxy server for MediaTek Genio NPU
+    description: An OpenAI-compatible proxy server that runs MediaTek optimized models on the MediaTek Genio NPU via llm_cmdline_tool
+
+apps:
+  qwen3:
+    command: bin/modelctl
+    completer: bin/snap-completer.bash
+    plugs:
+      - hardware-observe
+      - opengl
+      - network
+      - desktop # To open the webui in the browser
+    environment:
+      ADDITIONAL_FEATURES: chat, webui
+
+  server:
+    command: bin/server.sh
+    daemon: simple
+    plugs:
+      - network-bind
+      - hardware-observe
+      - opengl
+      - process-control
+      - home
+      # get the supported shared libraries for MediaTek NPU inference
+      - mediatek-npu-2404
+      # grants access to the NPU device
+      - mediatek-accel
+
+  server-webui:
+    command: bin/server-webui.sh
+    daemon: simple
+    plugs:
+      - network-bind
+
+lint:
+  ignore:
+    - metadata:
+      - license
+      - contact
