@@ -1,0 +1,8 @@
+*.snap
+prime
+parts
+stage
+tmp
+.remote-sync.json
+.DS*
+node-red_source.tar.bz2

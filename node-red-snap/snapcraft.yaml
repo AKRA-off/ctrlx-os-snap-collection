@@ -1,0 +1,295 @@
+name: node-red-custom
+title: Node-RED Custom
+adopt-info: node-red
+summary: Node-RED with industrial nodes and audio tools
+description: |
+  Custom Node-RED build for ctrlX OS, based on core24.
+  Includes industrial nodes, audio playback and recording client tools,
+  and interfaces for ctrlX active-configuration and package integration.
+  The actual HTTP ports are configured by the launch scripts and settings.
+
+base: core24
+confinement: strict
+grade: devel
+
+platforms:
+  amd64:
+    build-on: [amd64]
+  arm64:
+    build-on: [arm64]
+
+environment:
+  PATH: $SNAP/bin:$SNAP/usr/bin:$SNAP/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$SNAP/usr/lib/git-core
+  NODE_PATH: $SNAP/lib/node_modules
+
+apps:
+  node-red:
+    command: bin/startNR
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - alsa
+      - audio-playback
+      - audio-record
+      - bluez
+      - bluetooth-control
+      - camera
+      - gpio
+      - home
+      - network
+      - network-bind
+      - network-observe
+      - removable-media
+      - serial-port
+      - hardware-observe
+      - system-observe
+      - mount-observe
+      - raw-usb
+      - active-solution
+      - datalayer
+    slots:
+      - package-assets
+      - package-run
+
+  # Retained for compatibility with the original repository.
+  # Review authentication and binding before exposing this settings editor.
+  flask:
+    command: bin/configurator
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - network
+      - network-bind
+
+  npm:
+    command: bin/npm
+    plugs:
+      - home
+      - network
+  
+  bluealsa:
+    command: bin/startBlueALSA
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - bluez
+      - bluetooth-control
+      - hardware-observe
+      - raw-usb
+
+parts:
+  node:
+    plugin: dump
+    source:
+      - on amd64: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-x64.tar.gz
+      - on arm64: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-arm64.tar.gz
+
+  python-flask:
+    plugin: python
+    source: Flask
+    python-packages:
+      - flask
+    build-packages:
+      - python3-dev
+      - build-essential
+
+  python-code:
+    plugin: dump
+    source: ./Flask/
+    organize:
+      '*': bin/Flask/
+
+  node-red:
+    after: [node]
+    plugin: nil
+    source: .
+    build-packages:
+      - build-essential
+      - python3
+      - pkg-config
+      - libudev-dev
+      - libusb-1.0-0-dev
+    stage-packages:
+      - ca-certificates
+      - curl
+      - git
+      - openssh-client
+      - iputils-ping
+      - net-tools
+      - nmap
+      - ffmpeg
+      - pulseaudio-utils
+      - libpulse0
+      - libatomic1
+      - libstdc++6
+      - libudev1
+      - libusb-1.0-0
+      - alsa-utils
+      - libasound2-plugins
+      - libasound2t64
+      - libasound2-data
+      - dbus-bin
+    build-environment:
+      - NODE_RED_VERSION: '5.0.9'
+    override-build: |
+      set -eu
+      export PATH="$CRAFT_STAGE/bin:$PATH"
+      export npm_config_cache="$CRAFT_PART_BUILD/.npm-cache"
+
+      node --version
+      npm --version
+      mkdir -p "$CRAFT_PART_INSTALL/lib"
+
+      # For a reproducible release, replace this first-resolution install
+      # with a committed package.json/package-lock.json and npm ci.
+      npm install         --prefix "$CRAFT_PART_INSTALL/lib"         --omit=dev --no-audit --no-fund --save-exact         "node-red@$NODE_RED_VERSION"         monaco-js-linter         node-red-contrib-image-tools         monaco-editor         lodash         node-red-node-ping         node-red-contrib-cron-plus         node-red-node-random         node-red-node-rbe         node-red-node-serialport         node-red-dashboard         @flowfuse/node-red-dashboard         node-red-contrib-opcua         node-red-contrib-influxdb         node-red-contrib-mongodb3         node-red-contrib-ctrlx-automation         node-red-contrib-s7         node-red-contrib-cip-ethernet-ip         node-red-contrib-modbus         node-red-contrib-opcda-client         node-red-contrib-mic
+
+      # Preserve dependency assets during the initial migration.
+      find "$CRAFT_PART_INSTALL/lib/node_modules"         -type f -name '*.js.swp' -delete
+
+      # Node.js already supplies npm. Avoid collisions if Node-RED also
+      # installs npm at the top level of this prefix.
+      rm -rf "$CRAFT_PART_INSTALL/lib/node_modules/npm"
+
+      # Record the resolved dependency tree for inspection after building.
+      npm ls --prefix "$CRAFT_PART_INSTALL/lib" --depth=0         > "$CRAFT_PART_INSTALL/lib/installed-packages.txt"
+
+      VER=$(node -p "require('$CRAFT_PART_INSTALL/lib/node_modules/node-red/package.json').version")
+      craftctl set version="$VER"
+
+  scripts:
+    plugin: dump
+    source: scripts
+    organize:
+      start.sh: bin/startNR
+      start-bluealsa.sh: bin/startBlueALSA
+      configurator: bin/configurator
+    override-prime: |
+      craftctl default
+      chmod 0755 "$CRAFT_PRIME/bin/startNR"
+      chmod 0755 "$CRAFT_PRIME/bin/startBlueALSA"
+      chmod 0755 "$CRAFT_PRIME/bin/configurator"
+
+  configs:
+    plugin: dump
+    source: ./configs
+    organize:
+      'package-assets/*': package-assets/${CRAFT_PROJECT_NAME}/
+    # Other config files remain at their original relative paths.
+    # Map actual helper scripts explicitly once their names are known.
+
+  bluealsa:
+    plugin: nil
+    source: https://github.com/arkq/bluez-alsa.git
+    source-type: git
+    source-tag: v5.0.0
+
+    build-packages:
+      - autoconf
+      - automake
+      - build-essential
+      - libtool
+      - pkg-config
+      - libasound2-dev
+      - libbluetooth-dev
+      - libdbus-1-dev
+      - libglib2.0-dev
+      - libsbc-dev
+
+    stage-packages:
+      - libasound2t64
+      - libbluetooth3
+      - libdbus-1-3
+      - libglib2.0-0t64
+      - libsbc1
+
+    override-build: |
+      set -eu
+
+      autoreconf --install
+
+      ./configure \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var/snap/node-red-custom/common \
+        --disable-manpages \
+        --disable-hcitop \
+        --disable-upower \
+        --enable-a2dp
+
+      make -j"$(nproc)"
+      make DESTDIR="$CRAFT_PART_INSTALL" install
+
+  bluealsa-hfp-ag-plugin:
+    after:
+      - bluealsa
+    plugin: nil
+    source: https://github.com/borine/bluealsa-hfp-ag-plugin.git
+    source-type: git
+
+    build-packages:
+      - build-essential
+      - meson
+      - ninja-build
+      - pkg-config
+      - libasound2-dev
+      - libdbus-1-dev
+
+    override-build: |
+      set -eu
+
+      # Use the snap's writable data directory for HFP session locks.
+      sed -i '/^static const char \*get_lock_dir(void) {/a\
+              const char *snap_lockdir = getenv("SNAP_DATA");\
+              if (snap_lockdir != NULL && snap_lockdir[0] != 0)\
+                      return snap_lockdir;\
+      ' hfpag-session.c
+
+      export PKG_CONFIG_PATH="$CRAFT_STAGE/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pkgconfig:$CRAFT_STAGE/usr/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+      meson setup builddir \
+        --prefix=/usr \
+        --libdir="lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR" \
+        --buildtype=release
+
+      meson compile -C builddir
+
+      DESTDIR="$CRAFT_PART_INSTALL" \
+        meson install -C builddir
+
+plugs:
+  datalayer:
+    interface: content
+    content: datalayer
+    target: $SNAP_DATA/.datalayer
+
+  active-solution:
+    interface: content
+    content: solutions
+    target: $SNAP_COMMON/solutions
+
+slots:
+  package-assets:
+    interface: content
+    content: package-assets
+    source:
+      read:
+        - $SNAP/package-assets/${CRAFT_PROJECT_NAME}
+
+  # This exposes a directory only; it does not implement save/load callbacks.
+  package-run:
+    interface: content
+    content: package-run
+    source:
+      write:
+        - $SNAP_DATA/package-run/${CRAFT_PROJECT_NAME}
+
+  bluealsa-dbus:
+    interface: dbus
+    bus: system
+    name: org.bluealsa
+
+hooks:
+  # Requires executable snap/hooks/connect-plug-active-solution in the repo.
+  connect-plug-active-solution:
+    plugs: [active-solution]

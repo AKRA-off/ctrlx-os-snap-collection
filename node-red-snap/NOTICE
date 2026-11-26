@@ -1,0 +1,14 @@
+Modified Node-RED industrial snap
+Based on https://github.com/mauringo/node-red-industrial-snap, a fork of
+https://github.com/dceejay/nodered.snap (Apache-2.0, Copyright (c) 2017,2019
+Dave Conway-Jones, (c) 2016 Luca Capra). Parts originating from dceejay's
+snap remain available under Apache-2.0.
+
+Mauro Riboni's additions (copyright 2020) are licensed under the "General
+Conditions of Free Software License" in the LICENSE file. That license is
+NON-COMMERCIAL and requires modified versions to stay under the same license.
+It is NOT the MIT license that applies to other folders of this repository.
+
+Node-RED itself is Apache-2.0 (https://github.com/node-red/node-red) and is
+installed from upstream at build time. Node-RED nodes, MongoDB, InfluxDB and
+other bundled packages carry their own licenses.
