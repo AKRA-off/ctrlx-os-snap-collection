@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.boschrexroth.com/ctrlx-automation/ctrlx-core/apps/package-manifest/package-manifest.v1.1.schema.json",
+  "version": "1.0.0",
+  "id": "comfyui",
+  "configuration": {
+    "appDirectories": [
+      {
+        "name": "ComfyUI",
+        "description": "AI creation engine",
+        "icon": "bosch-ic-artificial-intelligence",
+        "copyOnLoad": true
+      }
+    ]
+  },
+  "menus": {
+    "sidebar": [
+      {
+        "id": "comfyui_sidebar",
+        "title": "ComfyUI",
+        "icon": "bosch-ic-artificial-intelligence",
+        "items": [
+          {
+            "id": "comfyui",
+            "target": "_blank",
+            "title": "Webpage",
+            "icon": "bosch-ic-artificial-intelligence",
+            "link": "http://${hostname}:8188/"
+          }
+        ]
+      }
+    ],
+    "settings": [
+    ],
+    "overview": [
+      {
+        "id": "comfyui",
+        "target": "_blank",
+        "title": "ComfyUI",
+        "icon": "bosch-ic-artificial-intelligence",
+        "link": "http://${hostname}:8188/"
+      }
+    ]    
+  }
+}

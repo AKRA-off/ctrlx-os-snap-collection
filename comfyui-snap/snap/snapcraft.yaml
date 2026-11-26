@@ -1,0 +1,245 @@
+name: comfyui
+base: core24
+version: '0.1-cpu'
+summary: CPU-only ComfyUI server for ctrlX OS testing
+description: |
+  Experimental CPU-only ComfyUI server.
+  No model weights are bundled.
+
+grade: devel
+confinement: strict
+compression: lzo
+
+platforms:
+  amd64:
+
+environment:
+  PYTHONPATH: $SNAP/venv/lib/python3.12/site-packages:$SNAP/opt/comfyui
+  PYTHONNOUSERSITE: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUNBUFFERED: '1'
+
+  LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pulseaudio:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/lapack
+
+apps:
+  comfyui:
+    command: bin/start-comfyui
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - network
+      - network-bind
+      - active-solution
+
+  activeconfiguration:
+    command: ./bin/set.sh
+    daemon: simple
+    plugs: [network, network-bind, active-solution]
+
+parts:
+
+  launcher:
+    plugin: dump
+    source: scripts
+
+    organize:
+      start-comfyui.sh: bin/start-comfyui
+
+    override-build: |
+      craftctl default
+      chmod 755 "$CRAFT_PART_INSTALL/start-comfyui.sh"
+
+
+  comfyui:
+    plugin: nil
+
+    source: https://github.com/Comfy-Org/ComfyUI.git
+    source-tag: v0.3.26
+
+    build-packages:
+      - git
+      - python3-dev
+      - python3-venv
+      - build-essential
+      - rsync
+
+    stage-packages:
+      - python3.12-minimal
+      - libpython3.12-stdlib
+      - libgomp1
+      - libstdc++6
+      - libglib2.0-0t64
+      - libgl1
+      - libsndfile1
+      - ca-certificates
+
+    override-build: |
+      set -eu
+
+      unset PYTHONHOME PYTHONPATH
+
+      # Do not keep large wheel caches inside the build.
+      export PIP_NO_CACHE_DIR=1
+
+      python3 -m venv --copies "$CRAFT_PART_INSTALL/venv"
+
+      PY="$CRAFT_PART_INSTALL/venv/bin/python3"
+
+      "$PY" -m pip install \
+        'pip==25.0.1' \
+        'setuptools==75.8.0' \
+        wheel
+
+      # ---------------------------------------------------------
+      # CPU-only PyTorch
+      # ---------------------------------------------------------
+
+      "$PY" -m pip install \
+        'torch==2.6.0+cpu' \
+        'torchvision==0.21.0+cpu' \
+        'torchaudio==2.6.0+cpu' \
+        --index-url https://download.pytorch.org/whl/cpu
+
+      # ---------------------------------------------------------
+      # Create CPU-only ComfyUI requirements
+      #
+      # ComfyUI requirements normally also specify torch.
+      # We already installed a known CPU-only PyTorch version,
+      # so don't allow pip to resolve torch again.
+      # ---------------------------------------------------------
+
+      grep -Ev \
+        '^[[:space:]]*(torch|torchvision|torchaudio)([[:space:]<>=!~;]|$)' \
+        requirements.txt \
+        > requirements-without-torch.txt
+
+      # ---------------------------------------------------------
+      # ComfyUI v0.3.26 expects frontend 1.11.8.
+      #
+      # That version is no longer available from the package
+      # index used in our build environment.
+      #
+      # The first available compatible-era version reported by
+      # pip is 1.12.8, so use that for this test build.
+      # ---------------------------------------------------------
+
+      sed -i \
+        's/comfyui-frontend-package==1\.11\.8/comfyui-frontend-package==1.12.8/' \
+        requirements-without-torch.txt
+
+      echo "==================================================="
+      echo "ComfyUI requirements selected for this CPU build:"
+      echo "==================================================="
+
+      grep -E \
+        'comfyui-frontend|torch|numpy|transformers|tokenizers' \
+        requirements-without-torch.txt || true
+
+      echo "==================================================="
+
+      # ---------------------------------------------------------
+      # Install the remaining ComfyUI dependencies.
+      # ---------------------------------------------------------
+
+      "$PY" -m pip install \
+        -c "$CRAFT_PROJECT_DIR/constraints-cpu.txt" \
+        -r requirements-without-torch.txt
+
+      # ---------------------------------------------------------
+      # Validate dependency consistency.
+      # ---------------------------------------------------------
+
+      "$PY" -m pip check
+
+      # Make absolutely sure this is CPU PyTorch.
+      "$PY" - <<'PY'
+      import torch
+
+      print("PyTorch version:", torch.__version__)
+      print("CUDA version:", torch.version.cuda)
+
+      assert torch.version.cuda is None, \
+          "Unexpected CUDA-enabled PyTorch build"
+      PY
+
+      # Fail if NVIDIA CUDA wheels somehow slipped in.
+      "$PY" - <<'PY'
+      import importlib.metadata as metadata
+
+      bad = []
+
+      for distribution in metadata.distributions():
+          name = distribution.metadata["Name"]
+
+          if name and name.lower().startswith("nvidia-"):
+              bad.append(name)
+
+      if bad:
+          raise RuntimeError(
+              "Unexpected NVIDIA packages in CPU build: "
+              + ", ".join(sorted(bad))
+          )
+
+      print("No NVIDIA Python packages detected.")
+      PY
+
+      # ---------------------------------------------------------
+      # Install ComfyUI source.
+      # ---------------------------------------------------------
+
+      mkdir -p \
+        "$CRAFT_PART_INSTALL/opt/comfyui" \
+        "$CRAFT_PART_INSTALL/usr/share/comfyui"
+
+      rsync -a \
+        --exclude=.git \
+        --exclude=__pycache__ \
+        --exclude='*.pyc' \
+        --exclude=requirements-without-torch.txt \
+        ./ \
+        "$CRAFT_PART_INSTALL/opt/comfyui/"
+
+      # Save exact Python package versions for troubleshooting.
+      "$PY" -m pip freeze \
+        > "$CRAFT_PART_INSTALL/usr/share/comfyui/build-packages.txt"
+
+      # Save exact ComfyUI commit.
+      git rev-parse HEAD \
+        > "$CRAFT_PART_INSTALL/usr/share/comfyui/source-revision.txt"
+
+  configs:     ##IMPORTANT PART for the package manifest file  <-------------------------------------------
+    source: ./configs
+    plugin: dump   ##With this plugin the content of the source is brought to the defined folder. In this case, what is inside the ./configs folder is copied to a package-assets/ folder
+    organize:
+      'package-assets/*': package-assets/${SNAPCRAFT_PROJECT_NAME}/
+
+  activeconfiguration:
+    source: ./configs/
+    plugin: dump
+    organize:
+      '*': bin/
+
+plugs:
+  active-solution:  
+      interface: content
+      content: solutions
+      target: $SNAP_COMMON/solutions
+
+slots:
+    # This slot is for sidebar integration
+    package-assets:         #This slot lets certain files be available outside the snap
+        interface: content
+        content: package-assets
+        source:
+            read:
+            - $SNAP/package-assets/${SNAPCRAFT_PROJECT_NAME}
+    package-run:
+        interface: content
+        content: package-run
+        source:
+            write:
+            - $SNAP_DATA/package-run/${SNAPCRAFT_PROJECT_NAME}
+
+hooks:
+    connect-plug-active-solution:  # Grants the hook access to the active-solution plug so it can create/manage folders under $SNAP_COMMON/solutions
+        plugs: [active-solution]

@@ -1,0 +1,12 @@
+ctrlX ComfyUI snap
+This folder (snap packaging, scripts and configs) is licensed under the
+GNU General Public License v3.0 (see LICENSE).
+
+ComfyUI (https://github.com/Comfy-Org/ComfyUI) is GPL-3.0 and is fetched from
+upstream at build time; it is not stored in this repository.
+ComfyUI-Pollinations (modules/ComfyUI-Pollinations) is GPL-3.0,
+https://github.com/1038lab/ComfyUI-Pollinations.
+
+No model weights are bundled. Models you download (e.g. Stable Diffusion,
+FLUX) carry their own licenses, which may restrict commercial use.
+Python dependencies are subject to their respective licenses.

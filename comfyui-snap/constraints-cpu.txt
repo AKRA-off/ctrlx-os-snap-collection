@@ -1,0 +1,6 @@
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+torchaudio==2.6.0+cpu
+numpy==1.26.4
+transformers==4.49.0
+tokenizers==0.21.0
