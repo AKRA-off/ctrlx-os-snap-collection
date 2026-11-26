@@ -1,0 +1,109 @@
+name: mysql
+base: core22
+version: '8.0.44'
+summary: MySQL server in a snap.
+description: |
+  The MySQL software delivers a very fast, multithreaded, multi-user,
+  and robust SQL (Structured Query Language) database server. MySQL
+  Server is intended for mission-critical, heavy-load production
+  systems as well as for embedding into mass-deployed software.
+
+grade: stable
+confinement: strict
+license: Apache-2.0
+#platforms:
+#  amd64:
+#  arm64:
+#  s390x:
+
+system-usernames:
+  snap_daemon: shared
+
+hooks:
+  install:
+    plugs:
+      - network
+      - network-bind
+      - removable-media
+      - system-files
+      - hardware-observe
+
+plugs:
+  system-files:
+    interface: system-files
+    write:
+      - /media/sdb1
+
+slots:
+  mysql-sockets:
+    interface: content
+    content: socket-directory
+    write:
+      - $SNAP_DATA/run
+
+apps:
+  mysqld:
+    command: bin/mysqld.sh
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - removable-media
+      - system-files
+      - hardware-observe
+  mysql:
+    command: usr/bin/mysql -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqladmin:
+    command: usr/bin/mysqladmin -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqlcheck:
+    command: usr/bin/mysqlcheck -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqldump:
+    command: usr/bin/mysqldump -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqlimport:
+    command: usr/bin/mysqlimport -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqlshow:
+    command: usr/bin/mysqlshow -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqlslap:
+    command: usr/bin/mysqlslap -S $SNAP_DATA/run/mysqld.sock
+    plugs:
+      - network
+  mysqlbinlog:
+    command: usr/bin/mysqlbinlog
+
+parts:
+  packages-deb:
+    plugin: nil
+    stage-packages:
+      - mysql-server-8.0
+      - util-linux
+    organize:
+      usr/share/doc/mysql-server-8.0/copyright: licenses/COPYRIGHT-mysql-server-8.0
+      usr/share/doc/util-linux/copyright: licenses/COPYRIGHT-util-linux
+  snap-license:
+    plugin: dump
+    source: .
+    source-type: local
+    stage:
+      - licenses/LICENSE-snap
+    organize:
+      LICENSE: licenses/LICENSE-snap
+  snap-scripts:
+    plugin: dump
+    source: snap/local
+    source-type: local
+    override-prime: |
+      craftctl default
+      sed -i 's/_NAME_/$SNAPCRAFT_PROJECT_NAME/g' bin/*.sh
+      sed -i 's/_NAME_/$SNAPCRAFT_PROJECT_NAME/g' etc/*.cnf
