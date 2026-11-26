@@ -1,0 +1,41 @@
+name: whisper-live-rocm
+
+servers:
+  openai:
+    protocol: http
+    base-path: /v1
+  myna:
+    protocol: http+unix
+    base-path: /v1
+  whisper-live:
+    protocol: ws
+    base-path: /
+    namespace: whisper-live
+
+environment:
+  # Export the server run script path
+  - SERVER_RUN_SCRIPT=$SNAP_COMPONENTS/whisper-live/bin/whisper-live-server.py
+  # Add the component's packages to PYTHONPATH
+  - PYTHONPATH=$PYTHONPATH:$SNAP_COMPONENTS/whisper-live/lib/python3.12/site-packages
+  - PYTHONPATH=$PYTHONPATH:$SNAP_COMPONENTS/whisper-live/lib64/python3.12/site-packages
+  # Prepend ROCm component's packages to PYTHONPATH
+  - PYTHONPATH=$SNAP_COMPONENTS/whisper-live-rocm/site-packages:$PYTHONPATH
+  # Add component's binaries
+  - PATH=$PATH:$SNAP_COMPONENTS/whisper-live/bin
+  # Add component's shared libraries
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live/lib
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live/usr/lib/$ARCH_TRIPLET
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live-rocm/site-packages/torch/lib
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live-rocm/usr/lib/$ARCH_TRIPLET
+  # Profiling is unused and its library scanner cannot resolve linux-vdso under confinement
+  - ROCPROFILER_REGISTER_ENABLED=0
+  # Switch to an alternative allocator to prevent out-of-memory crashes on ROCm when enough memory is available
+  - CT2_CUDA_ALLOCATOR=cub_caching
+  # Limit HIP to one hardware queue, this is needed so that the runtime can successfully free hardware
+  # resources when not actively running inference. Without this setting, GPU power draw remains high until the
+  # service is stopped.
+  - GPU_MAX_HW_QUEUES=1
+
+components:
+  - whisper-live
+  - whisper-live-rocm

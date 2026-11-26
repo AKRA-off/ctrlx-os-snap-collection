@@ -1,0 +1,26 @@
+name: cpu
+summary: CPU-optimized for workstations
+description: |
+  This engine uses WhisperLive through the Myna adapter.
+
+vendor: Canonical Ltd
+
+devices:
+  anyof:
+    - type: cpu
+      architecture: amd64
+    - type: cpu
+      architecture: arm64
+
+runtime: whisper-live
+
+model:
+  default: faster-whisper-base
+  options:
+    - faster-whisper-base
+    - faster-whisper-small
+
+configurations:
+  whisper-live.ws.port: 8351
+  whisper-live.ws.host: localhost
+  transcription-language: system

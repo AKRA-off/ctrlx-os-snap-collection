@@ -1,0 +1,32 @@
+name: whisper-live
+
+servers:
+  openai:
+    protocol: http
+    base-path: /v1
+  myna:
+    protocol: http+unix
+    base-path: /v1
+  whisper-live:
+    protocol: ws
+    base-path: /
+    namespace: whisper-live
+
+environment:
+  # Export the server run script path
+  - SERVER_RUN_SCRIPT=$SNAP_COMPONENTS/whisper-live/bin/whisper-live-server.py
+  # Add the component's packages to PYTHONPATH
+  - PYTHONPATH=$PYTHONPATH:$SNAP_COMPONENTS/whisper-live/lib/python3.12/site-packages
+  - PYTHONPATH=$PYTHONPATH:$SNAP_COMPONENTS/whisper-live/lib64/python3.12/site-packages
+  # Add CPU component's packages to PYTHONPATH
+  - PYTHONPATH=$PYTHONPATH:$SNAP_COMPONENTS/whisper-live-cpu/site-packages
+  # Add component's binaries
+  - PATH=$PATH:$SNAP_COMPONENTS/whisper-live/bin
+  # Add component's shared libraries
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live/lib
+  # Add component's shared libraries
+  - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SNAP_COMPONENTS/whisper-live/usr/lib/$ARCH_TRIPLET
+
+components:
+  - whisper-live
+  - whisper-live-cpu

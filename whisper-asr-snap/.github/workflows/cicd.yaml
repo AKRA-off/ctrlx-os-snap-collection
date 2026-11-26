@@ -1,0 +1,30 @@
+# This workflow is used to build and publish the snap to the store on every push to main.
+name: CICD
+
+on:
+  push:
+    branches:
+      - main
+  
+  workflow_dispatch: # manual trigger 
+
+# Keep one CICD run active at a time so publish/test/promote happen in order
+concurrency:
+  group: ${{ github.workflow }}
+  queue: max
+
+jobs:
+  build-edge:
+    if: github.repository == 'canonical/whisper-asr-snap' # do not run on forks
+    uses: canonical/inference-snaps-dev/.github/workflows/build-publish-snap.yaml@v2
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ["amd64", "large", "noble", "self-hosted"]
+          - ["arm64", "large", "noble", "self-hosted"]
+    with:
+      runner: "${{ toJSON(matrix.runner) }}"
+      publish-channel: latest/edge
+    secrets:
+      store-credentials: ${{ secrets.STORE_LOGIN_MAIN }} 

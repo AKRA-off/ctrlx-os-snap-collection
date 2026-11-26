@@ -1,0 +1,370 @@
+name: whisper-asr
+title: Whisper ASR
+summary: Local Speech-to-Text (STT) using Whisper ASR inference snap
+description: |
+  This snap provides a local speech-to-text (STT) solution using OpenAI's Whisper models.
+  
+  It uses the WhisperLive for real-time transcription and provides an OpenAI adapter for exposing an OpenAI-like Realtime Transcription API.
+website: https://documentation.ubuntu.com/inference-snaps
+source-code: https://github.com/canonical/whisper-snap
+issues: https://github.com/canonical/inference-snaps/issues
+
+base: core24
+adopt-info: version
+
+grade: devel
+confinement: strict
+compression: lzo
+
+platforms:
+  amd64:
+  arm64: 
+
+hooks:
+  install:
+    plugs: &install-plugs
+      # For hardware detection
+      - hardware-observe
+      - opengl
+  post-refresh:
+    plugs: *install-plugs
+
+slots:
+  provider:
+    interface: content
+    content: inference-provider
+    source:
+      write:
+        - $SNAP_COMMON/share/provider
+
+environment:
+  SNAP_COMPONENTS: /snap/$SNAP_INSTANCE_NAME/components/$SNAP_REVISION
+  ARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
+  # This is to find the intel.icd file, containing the path to libigdrcl.so
+  # Required for Intel GPU detection and communication
+  OCL_ICD_VENDORS: $SNAP/etc/OpenCL/vendors
+  LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pulseaudio:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/lapack
+
+
+layout:
+  # OpenCL looks in /etc/OpenCL/vendors for .icd files containing the paths to shared objects
+  /etc/OpenCL/vendors:
+    bind: $SNAP/etc/OpenCL/vendors
+  # Intel icd files use an absolute path to Intel OpenCL shared objects. Use a layout to mount the so files at the expected location
+  /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/intel-opencl:
+    bind: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/intel-opencl
+  # Under wsl the libraries are expected in /usr/lib/wsl
+  /usr/lib/wsl:
+    bind: $SNAP_COMMON/usr/lib/wsl
+
+parts:
+  scripts:
+    plugin: dump
+    source: ./scripts
+    stage-packages:
+      - jq
+    organize:
+      whisper-live-server.sh: bin/whisper-live-server
+      openai-adapter.sh: bin/openai-adapter
+      whisper-live-server.py: (component/whisper-live)/bin/whisper-live-server.py
+      # TODO: there's no "export-shared-configs" script
+
+  version:
+    after: [cli]
+    plugin: nil
+    source: . # To regenerate the git hash on every change
+    build-packages:
+      - jq
+      - git
+    override-pull: |
+      # Do nothing. This significantly reduces build time when sourcing large files.
+    override-build: |
+      set -eo pipefail
+      cli_version=$($CRAFT_STAGE/bin/modelctl version --format=json | jq .cli --raw-output)
+      git_hash=$(git -C "$SNAPCRAFT_PROJECT_DIR" describe --always)
+      craftctl set version="${cli_version#v}+${git_hash}"
+
+  cli:
+    source:
+      - on amd64: https://github.com/canonical/inference-snaps-cli/releases/download/v2.0.0-beta.15/inference-snaps-cli-linux-amd64.tar.xz
+      - on arm64: https://github.com/canonical/inference-snaps-cli/releases/download/v2.0.0-beta.15/inference-snaps-cli-linux-arm64.tar.xz
+    plugin: dump
+    override-build: |
+
+      # For tab completion
+      ln --symbolic ./modelctl bin/whisper-asr
+
+      craftctl default
+
+  cli-dependencies:
+    plugin: nil
+    stage-packages:
+      - pciutils # lspci
+      - clinfo # used for Intel GPU vRAM detection. It depends on intel-opencl-icd
+      - coreutils # to have `nproc`
+
+  # OpenCL ICD and libigdgmm are required for Intel GPU vRAM lookup with clinfo
+  cli-intel-opencl-icd:
+    plugin: nil
+    build-packages:
+      - wget
+    override-build: |
+      if [ "$CRAFT_ARCH_BUILD_FOR" == "amd64" ]; then
+        # First install the legacy support version. Then install the latest, so that latest can override any old libraries.
+      
+        # Legacy
+        mkdir -p "$CRAFT_PART_BUILD/icd-legacy"
+        cd "$CRAFT_PART_BUILD/icd-legacy"
+        wget -nv https://github.com/intel/compute-runtime/releases/download/24.35.30872.36/intel-opencl-icd-legacy1_24.35.30872.36_amd64.deb
+        dpkg --root="$CRAFT_PART_INSTALL" --force-all -i "$CRAFT_PART_BUILD/icd-legacy"/*.deb
+      
+        # Latest
+        mkdir -p "$CRAFT_PART_BUILD/icd-latest"
+        cd "$CRAFT_PART_BUILD/icd-latest"
+        wget -nv https://github.com/intel/compute-runtime/releases/download/26.22.38646.4/intel-opencl-icd_26.22.38646.4-0_amd64.deb
+        wget -nv https://github.com/intel/compute-runtime/releases/download/26.22.38646.4/libigdgmm12_22.10.0_amd64.deb
+        dpkg --root="$CRAFT_PART_INSTALL" --force-all -i "$CRAFT_PART_BUILD/icd-latest"/*.deb
+      
+        # Two symlinks are created when installing intel-opencl-icd-legacy: 
+        # etc/alternatives/ocloc -> /usr/bin/ocloc-24.35.0, usr/bin/ocloc -> /etc/alternatives/ocloc
+        # These point to outside of the snap and fails store review. They are not required, so remove it.
+        rm $CRAFT_PART_INSTALL/etc/alternatives/ocloc
+        rm $CRAFT_PART_INSTALL/usr/bin/ocloc
+      fi
+      
+      craftctl default
+
+   # For Intel GPU usage, amd64 only
+  intel-compute-runtime:
+    plugin: nil
+    build-packages:
+      - wget
+    stage-packages:
+      - on amd64:
+          - ocl-icd-libopencl1
+    override-build: |
+      if [ "$CRAFT_ARCH_BUILD_FOR" == "amd64" ]; then
+        # First install the legacy support version. Then install the latest, so that latest can override any old libraries.
+      
+        # Legacy
+        mkdir -p "$CRAFT_PART_BUILD/opencl-intel-legacy1"
+        cd "$CRAFT_PART_BUILD/opencl-intel-legacy1"
+        wget -nv https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.24/intel-igc-core_1.0.17537.24_amd64.deb
+        wget -nv https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.24/intel-igc-opencl_1.0.17537.24_amd64.deb
+        wget -nv https://github.com/intel/compute-runtime/releases/download/24.35.30872.36/intel-level-zero-gpu-legacy1_1.5.30872.36_amd64.deb
+        dpkg --root="$CRAFT_PART_INSTALL" --force-all -i *.deb
+      
+        # Latest
+        mkdir -p "$CRAFT_PART_BUILD/opencl-intel"
+        cd "$CRAFT_PART_BUILD/opencl-intel"
+        wget -nv https://github.com/intel/intel-graphics-compiler/releases/download/v2.36.3/intel-igc-core-2_2.36.3+21719_amd64.deb
+        wget -nv https://github.com/intel/intel-graphics-compiler/releases/download/v2.36.3/intel-igc-opencl-2_2.36.3+21719_amd64.deb
+        wget -nv https://github.com/intel/compute-runtime/releases/download/26.22.38646.4/intel-ocloc_26.22.38646.4-0_amd64.deb
+        wget -nv https://github.com/intel/compute-runtime/releases/download/26.22.38646.4/libze-intel-gpu1_26.22.38646.4-0_amd64.deb
+        dpkg --root="$CRAFT_PART_INSTALL" --force-all -i *.deb
+      
+        cd "$CRAFT_PART_BUILD"
+      fi # End of Intel Compute Runtime installation
+      
+      craftctl default
+    organize:
+      # move everything, including the staged packages
+      "*": (component/whisper-live-openvino)
+
+  engines:
+    source: engines
+    plugin: dump
+    override-build: |
+      rm -rf nvidia-gpu amd-gpu
+      craftctl default
+    organize:
+      "*": engines/
+
+  models:
+    source: models
+    plugin: dump
+    organize:
+      "*": models/
+
+  runtimes:
+    source: runtimes
+    plugin: dump
+    organize:
+      "*": runtimes/
+
+  local-component-files:
+     # Use the cmake plugin instead of "dump" to prevent unwanted copies
+     # See https://github.com/canonical/craft-parts/issues/1609
+    plugin: cmake
+    source: components
+    #override-build: |
+    #  cp -rf --archive --link --no-dereference ${CRAFT_PART_SRC}/* ${CRAFT_PART_INSTALL}
+    override-build: |
+      if compgen -G "${CRAFT_PART_SRC}/*" > /dev/null; then
+        cp -rf --archive --link --no-dereference ${CRAFT_PART_SRC}/* ${CRAFT_PART_INSTALL}
+      fi
+    organize:
+      "model-faster-whisper-base/*": (component/model-faster-whisper-base)
+      "model-whisper-base-ov/*": (component/model-whisper-base-ov)
+      "model-faster-whisper-small/*": (component/model-faster-whisper-small)
+      "model-whisper-small-ov/*": (component/model-whisper-small-ov)
+    prime:
+      # Exclude everything not explicitly organized
+      - -*
+
+  myna-adapter:
+    plugin: go
+    source: .
+    build-snaps:
+      - go/1.26/stable
+    stage-packages:
+      - ffmpeg
+
+  whisper-live:
+    plugin: python
+    source: https://github.com/collabora/WhisperLive.git
+    source-branch: main
+
+    python-requirements:
+      - requirements/server.txt
+
+    override-pull: |
+      craftctl default
+
+      # Replace upstream requirements with our CPU-only list
+      cp "$CRAFT_PROJECT_DIR/server-cpu.txt" \
+         "$CRAFT_PART_SRC/requirements/server.txt"
+
+      # Prevent setup.py from pulling GPU/OpenVINO dependencies
+      sed -i \
+        -e '/nvidia-/d' \
+        -e '/openvino/d' \
+        -e '/optimum/d' \
+        -e '/torchaudio/d' \
+        -e '/torch[<=>]/d' \
+        "$CRAFT_PART_SRC/setup.py"
+
+    build-packages:
+      - python3-dev
+      - python3-venv
+      - python3-pip
+      - pkg-config
+      - portaudio19-dev
+
+    stage-packages:
+      - python3-minimal
+
+    override-build: |
+      craftctl default
+      mv LICENSE ${CRAFT_PART_INSTALL}/usr/share/doc/WhisperLive
+
+      move_packages_to_component() {
+        local packages_filter="$1"
+        local component_name="$2"
+
+        local component_name_normalized=$(echo "$component_name" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+        local destination_component_env="CRAFT_COMPONENT_${component_name_normalized}_PRIME"
+        local destination_component_dir="${!destination_component_env}"
+
+        mkdir -p "$destination_component_dir/site-packages/"
+
+        cp -arf --link \
+          "${CRAFT_PART_INSTALL}"/lib/python*/site-packages/${packages_filter} \
+          "$destination_component_dir/site-packages/"
+
+        rm -rf \
+          "${CRAFT_PART_INSTALL}"/lib/python*/site-packages/${packages_filter}
+      }
+
+      # CPU CTranslate2 belongs in whisper-live-cpu
+      move_packages_to_component "ctranslate2*" "whisper-live-cpu"
+
+    organize:
+      "*": (component/whisper-live)
+  
+  cpu-dependencies:
+    plugin: nil
+    build-packages:
+      - python3-dev
+      - python3-pip
+      - pkg-config
+    override-build: |
+      # Install pytorch CPU
+      pip install "torch==2.14.0+cpu" --no-deps \
+        --index-url https://download.pytorch.org/whl/cpu \
+        --target "$CRAFT_PART_INSTALL"/site-packages
+    organize:
+      "*": (component/whisper-live-cpu)
+
+  notice:
+    plugin: nil
+    source: NOTICE
+    source-type: file
+    override-build: |
+      license_dir=$CRAFT_PART_INSTALL/usr/share/doc
+      mkdir -p $license_dir
+      cp NOTICE $license_dir/
+      cp $SNAPCRAFT_PROJECT_DIR/LICENSE $license_dir/
+      cp $SNAPCRAFT_PROJECT_DIR/LICENSE-whisper $license_dir/
+
+components:
+  model-faster-whisper-base:
+    type: standard
+    summary: OpenAI's Whisper-Base translated to the CTranslate2 format
+    description: Model weights for OpenAI's Whisper-Base in the CTranslate2 format
+  
+  model-faster-whisper-small:
+    type: standard
+    summary: OpenAI's Whisper-Small translated to the CTranslate2 format
+    description: Model weights for OpenAI's Whisper-Small in the CTranslate2 format
+  
+  model-whisper-base-ov:
+    type: standard
+    summary: OpenAI's Whisper-Base translated to the OpenVINO format
+    description: Model weights for OpenAI's Whisper-Base in the OpenVINO format
+  
+  model-whisper-small-ov:
+    type: standard
+    summary: OpenAI's Whisper-Small translated to the OpenVINO format
+    description: Model weights for OpenAI's Whisper-Small in the OpenVINO format
+
+  whisper-live:
+    type: standard
+    summary: WhisperLive server for real-time transcription
+    description: A WebSocket-based server performing real-time speech transcription using OpenAI's models.
+
+  whisper-live-cpu:
+    type: standard
+    summary: WhisperLive dependencies for CPU inference
+    description: Set of libraries to enable WhisperLive to use CPU for inference.
+
+  whisper-live-openvino:
+    type: standard
+    summary: WhisperLive dependencies for OpenVINO inference
+    description: Set of libraries to enable WhisperLive to use Intel devices for inference.
+  
+apps:
+  whisperlive-backend:
+    command: bin/whisper-live-server
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+      - opengl
+      - hardware-observe
+      - process-control
+
+  server:
+    command: bin/openai-adapter
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+
+  whisper-asr:
+    command: bin/whisper-asr
+    completer: bin/snap-completer.bash
+    plugs:
+      - hardware-observe
+      - opengl
+      - network

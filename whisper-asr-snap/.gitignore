@@ -1,0 +1,6 @@
+myna-adapter
+__debug_*
+*.snap
+*.comp
+.venv/
+components/

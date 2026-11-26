@@ -1,0 +1,31 @@
+name: nvidia-gpu
+summary: CUDA optimized for workstation GPUs
+description: |
+  This engine uses WhisperLive with the CUDA backend.
+  
+  It is optimized for NVIDIA GPUs.
+  
+  This engine supports the amd64 CPU architecture.
+
+vendor: Canonical Ltd
+
+devices:
+  allof:
+    - type: gpu
+      vendor-id: 0x10de # Nvidia Corporation
+  anyof:
+    - type: cpu
+      architecture: amd64
+
+runtime: whisper-live-cuda
+
+model:
+  default: faster-whisper-base
+  options:
+    - faster-whisper-base
+    - faster-whisper-small
+
+configurations:
+  whisper-live.ws.port: 8351
+  whisper-live.ws.host: localhost
+  transcription-language: system

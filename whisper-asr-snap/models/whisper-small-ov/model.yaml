@@ -1,0 +1,24 @@
+name: whisper-small-ov
+
+# Alias is used for WhisperLive model identification; 
+# Must be one of the WhisperLive's accepted model name
+#  e.g. tiny, base, small, large...
+alias: small 
+
+description: OpenAI's Whisper-Small model weights translated to the OpenVINO format. This model is designed for speech recognition tasks and provides a balance between accuracy and computational efficiency.
+model-card-url: https://huggingface.co/OpenVINO/whisper-small-fp16-ov
+quantization: FP16
+
+disk-size: 471M
+
+capabilities:
+  - realtime-transcription
+
+components:
+  - model-whisper-small-ov
+
+environment:
+  - MODEL_DIR=$SNAP_COMPONENTS/model-whisper-small-ov/
+  - MODEL_NAME=whisper-small-ov
+  # From https://openai-whisper.mintlify.app/concepts/languages
+  - MODEL_SUPPORTED_LANGUAGES="auto,af,sq,am,ar,hy,as,az,ba,eu,be,bn,bs,br,bg,yue,ca,zh,hr,cs,da,nl,en,et,fo,fi,fr,gl,ka,de,el,gu,ht,ha,haw,he,hi,hu,is,id,it,ja,jw,kn,kk,km,ko,lo,la,lv,ln,lt,lb,mk,mg,ms,ml,mt,mr,mn,my,mi,ne,no,nn,oc,ps,fa,pl,pt,pa,ro,ru,sa,sr,sn,sd,si,sk,sl,so,es,su,sw,sv,tl,tg,ta,tt,te,th,bo,tr,tk,uk,ur,uz,vi,cy,yi,yo"
