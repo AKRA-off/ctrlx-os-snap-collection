@@ -1,0 +1,465 @@
+/* Main Application Styles - Bosch Rexroth Industrial Design */
+
+:root {
+    /* Bosch Rexroth Primary Colors */
+    --primary-blue: #005691;
+    --secondary-blue: #0082C8;
+    --dark-blue: #003d63;
+    --light-blue: #E6F2F7;
+
+    /* Neutral Colors */
+    --dark-gray: #333333;
+    --medium-gray: #6c757d;
+    --light-gray: #F5F5F5;
+    --white: #FFFFFF;
+
+    /* Accent Colors */
+    --accent-orange: #FF6900;
+    --success-green: #00A650;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    color: var(--dark-gray);
+    line-height: 1.6;
+}
+
+/* 3D viewer iframe (optional, home page) */
+.iframe-container {
+    position: relative;
+    width: 100%;
+    padding-top: 75%;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--light-gray);
+}
+
+.responsive-iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+/* Header Styling */
+.main-header {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 0;
+}
+
+.header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.company-logo {
+    height: 60px;
+    width: auto;
+    transition: transform 0.3s ease;
+}
+
+.company-logo:hover {
+    transform: scale(1.05);
+}
+
+.app-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.app-title h1 {
+    color: var(--white);
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.ctrlx-logo {
+    height: 50px;
+    width: auto;
+}
+
+/* Navigation */
+.main-nav {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 2px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.nav-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.navbar-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+    align-items: center;
+}
+
+.nav-item {
+    list-style: none;
+    display: inline-block;
+}
+
+.nav-link {
+    color: var(--dark-gray) !important;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem !important;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.nav-link:hover {
+    background: #f5f5f5;
+    color: var(--dark-gray) !important;
+    border-color: #e0e0e0;
+}
+
+.nav-link.active {
+    background: var(--primary-blue);
+    color: var(--white) !important;
+    box-shadow: 0 2px 4px rgba(0, 86, 145, 0.2);
+}
+
+/* Main Content Area */
+.main-content {
+    max-width: 1600px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+.content-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.content-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Buttons */
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 86, 145, 0.3);
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 86, 145, 0.4);
+    background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
+}
+
+.btn-secondary-custom {
+    background: linear-gradient(135deg, var(--success-green) 0%, #00863e 100%);
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 166, 80, 0.3);
+}
+
+.btn-secondary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 166, 80, 0.4);
+}
+
+.btn-outline-custom {
+    background: transparent;
+    color: var(--primary-blue);
+    border: 2px solid var(--primary-blue);
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-custom:hover {
+    background: var(--primary-blue);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+.btn-white-custom {
+    background: var(--white);
+    color: var(--primary-blue);
+    border: 2px solid var(--white);
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.btn-white-custom:hover {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Settings Cards */
+.settings-card {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--dark-blue) 100%);
+    color: var(--white);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 86, 145, 0.3);
+    border: 2px solid var(--dark-blue);
+}
+
+.settings-card h2 {
+    color: var(--white);
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+    padding-bottom: 0.5rem;
+}
+
+.settings-card-light {
+    background: linear-gradient(135deg, var(--light-blue) 0%, #f0f7fc 100%);
+    border: 2px solid var(--primary-blue);
+    color: var(--dark-gray);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.settings-card-light h2 {
+    color: var(--primary-blue);
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    border-bottom: 3px solid var(--primary-blue);
+    padding-bottom: 0.5rem;
+}
+
+.settings-card-light h4 {
+    color: var(--dark-gray);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.settings-card-light .form-label h4 {
+    margin: 0;
+}
+
+/* Form Elements */
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border: 2px solid var(--light-gray);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+    background: var(--white);
+    color: var(--dark-gray);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(0, 86, 145, 0.1);
+}
+
+.form-input::placeholder {
+    color: var(--medium-gray);
+}
+
+.form-select {
+    width: 100%;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border: 2px solid var(--light-gray);
+    border-radius: 6px;
+    font-size: 1rem;
+    background: var(--white);
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(0, 86, 145, 0.1);
+}
+
+/* Image Container */
+.image-container {
+    background: var(--medium-gray);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+}
+
+/* Footer */
+.main-footer {
+    background: linear-gradient(135deg, var(--dark-gray) 0%, var(--primary-blue) 100%);
+    color: var(--white);
+    text-align: center;
+    padding: 2rem;
+    margin-top: 4rem;
+    box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.main-footer p {
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* Info Display */
+.info-box {
+    background: var(--light-blue);
+    border-left: 4px solid var(--primary-blue);
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 6px;
+}
+
+.info-box p {
+    margin: 0;
+    color: var(--primary-blue);
+    font-weight: 500;
+}
+
+/* File List */
+.file-list {
+    list-style: none;
+    padding: 0;
+}
+
+.file-list li {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    border-radius: 6px;
+    border-left: 3px solid var(--secondary-blue);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .logo-section {
+        flex-direction: column;
+    }
+
+    .company-logo, .ctrlx-logo {
+        height: 40px;
+    }
+
+    .app-title h1 {
+        font-size: 1.5rem;
+    }
+
+    .navbar-nav {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .main-content {
+        padding: 0 1rem;
+    }
+}
+
+/* Save Settings Button - Fixed at Bottom */
+.save-settings-container {
+    position: sticky;
+    bottom: 0;
+    background: var(--white);
+    padding: 1.5rem;
+    margin-top: 2rem;
+    border-top: 3px solid var(--primary-blue);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    z-index: 100;
+}
+
+.save-settings-btn {
+    background: linear-gradient(135deg, var(--accent-orange) 0%, #e55a2b 100%);
+    color: var(--white);
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 12px rgba(255, 107, 53, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.save-settings-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(255, 107, 53, 0.5);
+    background: linear-gradient(135deg, #e55a2b 0%, var(--accent-orange) 100%);
+}

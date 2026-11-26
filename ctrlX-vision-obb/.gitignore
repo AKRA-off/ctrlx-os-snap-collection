@@ -1,0 +1,31 @@
+# ---- Python caches ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- Label-tool build artifacts (PyInstaller) ----
+roLabelImg/build/
+roLabelImg/dist/
+roLabelImg/*.spec
+roLabelImg/app.ico
+
+# ---- Local/editor/OS junk ----
+*.tmp
+*.log
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# ---- Models ----
+# Ignore ALL model weights by default, then keep only the ACTIVE ones so
+# the DEV repo stays lean (experiments/base models stay local).
+dependencies/default/*.onnx
+dependencies/default/*.pt
+dependencies/default/*.hef
+
+!dependencies/default/obb_train7_ctrlx_CLAHE.onnx
+!dependencies/default/obb_train7_ctrlx.pt
+!dependencies/default/cls_train7_ctrlx_CLAHE.onnx
+!dependencies/default/cls_train7_ctrlx.pt

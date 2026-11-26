@@ -1,0 +1,12 @@
+path: C:/Users/kra7spb/Pictures/FPT_Kassow_train/camera_shots/train2
+train: images/train
+val: images/val
+names:
+  0: C
+  1: F
+  2: L
+  3: O
+  4: R
+  5: S
+  6: T
+  7: X

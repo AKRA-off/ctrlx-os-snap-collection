@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CtrlX YOLO Detection System</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{url_for('static', filename='bootstrap/bootstrap.min.css')}}" rel="stylesheet">
+  <link href="{{url_for('static', filename='bootstrap/main-style.css')}}" rel="stylesheet">
+  <script src="{{url_for('static', filename='bootstrap/bootstrap.bundle.min.js')}}"></script>
+</head>
+<body>
+
+<!-- Main Header -->
+<header class="main-header">
+  <div class="header-container">
+    <div class="logo-section">
+      <img src="{{url_for('static', filename='image/rexroth.png')}}" alt="Bosch Rexroth Logo" class="company-logo">
+    </div>
+    <div class="app-title">
+      <img src="{{url_for('static', filename='image/Ctrlx_automation2.png')}}" alt="CtrlX Logo" class="ctrlx-logo">
+      <h1>YOLO Detection System</h1>
+    </div>
+  </div>
+</header>
+
+<!-- Navigation -->
+<nav class="main-nav">
+  <div class="nav-container">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a href="{{ url_for('index') }}" class="nav-link active">Home</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div class="main-content">
+  <div class="row">
+    <div class="col-md-3 mb-4">
+      <div class="content-card">
+        <h3 style="margin-bottom: 1.5rem; color: var(--dark-gray);">Control Panel</h3>
+        <p style="margin-bottom: 1.5rem;">Press "Run" button to start detection</p>
+
+        {% if variable == 3 %}
+        <form action="{{ url_for('index') }}" method="post" style="margin-bottom: 1rem;">
+          <label class="form-label"><strong>Input Image</strong></label>
+          <select class="form-select" name="preload_image" onchange="this.form.submit()">
+            <option value="" {% if not preload_selected %}selected{% endif %}>pre0.jpg (last capture)</option>
+            {% for f in preload_images %}
+            <option value="{{ f }}" {% if f == preload_selected %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        {% endif %}
+
+        <form id="run-form" action="{{ url_for('index') }}" method="post">
+          <input type="hidden" value="1" name="bool_flask" placeholder="">
+          <input type="submit" class="btn-primary-custom" value="Run Detection" style="width: 100%;">
+        </form>
+      </div>
+
+      <!-- Detection Statistics -->
+      <div class="content-card" style="margin-top: 1.5rem;">
+        <h3 style="margin-bottom: 1rem; color: var(--dark-gray);">Detection Results</h3>
+        <div class="info-box" style="padding: 1rem; background-color: #f8f9fa; border-radius: 4px;">
+          <p style="margin-bottom: 0.5rem;"><strong>Objects Detected:</strong> <span id="stat-qty">{{ output_qty }}</span></p>
+          <p style="margin-bottom: 0;"><strong>Processing Time:</strong> <span id="stat-time">{{ time_toweb }}</span>s</p>
+        </div>
+
+        <div style="margin-top: 1rem; max-height: 22rem; overflow-y: auto;">
+          <table class="table table-sm" style="width: 100%; font-size: 0.82rem;">
+            <thead>
+              <tr>
+                <th>Class</th><th>%</th>
+                <th id="th-x">X px</th><th id="th-y">Y px</th>
+                <th>&ang;&deg;</th>
+              </tr>
+            </thead>
+            <tbody id="det-tbody">
+              <tr><td colspan="5" style="color: var(--medium-gray);">no detections yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-9">
+      {% if iframe_show %}
+      <div class="row">
+        <div class="col-xl-6 mb-4">
+          <div class="content-card">
+            <h2 style="margin-bottom: 1rem; color: var(--dark-gray);">Detection Result</h2>
+            <div class="image-container">
+              <img id="result-img" src="{{url_for('download_file', filename='inf0.jpg')}}" alt="Detection Result">
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-6 mb-4">
+          <div class="content-card">
+            <h2 style="margin-bottom: 1rem; color: var(--dark-gray);">3D Viewer</h2>
+            <div class="iframe-container">
+              <iframe id="viewer3d" class="responsive-iframe" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="content-card">
+        <h2 style="margin-bottom: 1rem; color: var(--dark-gray);">Detection Result</h2>
+        <div class="image-container">
+          <img id="result-img" src="{{url_for('download_file', filename='inf0.jpg')}}" alt="Detection Result">
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="main-footer">
+  <p>&copy; 2025 Bosch Rexroth</p>
+</footer>
+
+<script>
+{% if iframe_show %}
+// 3D viewer: same host the browser is connected to, https default port
+document.getElementById('viewer3d').src =
+  'https://' + window.location.hostname + '/' + {{ iframe_path|tojson }};
+{% endif %}
+
+// Auto-refresh: update the result image, stats and results table in
+// place (no page reload, so the 3D viewer keeps its state)
+let isProcessing = false;
+let wasProcessing = false;
+
+function renderDetections(data) {
+  const unit = data.calibrated ? 'mm' : 'px';
+  document.getElementById('th-x').textContent = 'X ' + unit;
+  document.getElementById('th-y').textContent = 'Y ' + unit;
+  const tbody = document.getElementById('det-tbody');
+  if (!data.detections || data.detections.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color: var(--medium-gray);">no detections</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.detections.map(d =>
+    '<tr><td><strong>' + d.cls + '</strong></td>' +
+    '<td>' + d.score.toFixed(0) + '</td>' +
+    '<td>' + d.x.toFixed(data.calibrated ? 1 : 0) + '</td>' +
+    '<td>' + d.y.toFixed(data.calibrated ? 1 : 0) + '</td>' +
+    '<td>' + (d.angle !== null ? d.angle.toFixed(1) : '-') + '</td></tr>'
+  ).join('');
+}
+
+function updateDetectionData() {
+  fetch("{{ url_for('get_detection_data') }}")
+    .then(response => response.json())
+    .then(data => {
+      wasProcessing = isProcessing;
+      isProcessing = data.is_processing;
+
+      if (wasProcessing && !isProcessing) {
+        const img = document.getElementById('result-img');
+        img.src = "{{url_for('download_file', filename='inf0.jpg')}}" +
+                  '?t=' + Date.now();
+        document.getElementById('stat-qty').textContent = data.output_qty;
+        document.getElementById('stat-time').textContent = data.time_toweb;
+        renderDetections(data);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching detection data:', error);
+    });
+}
+
+// Fill the table with the last results on page load
+fetch("{{ url_for('get_detection_data') }}").then(r => r.json()).then(renderDetections)
+  .catch(() => {});
+
+setInterval(updateDetectionData, 500);
+
+document.getElementById('run-form').addEventListener('submit', function() {
+  isProcessing = true;
+});
+</script>
+
+</body>
+</html>

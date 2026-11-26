@@ -1,0 +1,24 @@
+ctrlX Vision OBB snap
+Copyright (c) Akra
+
+This folder is licensed under the GNU Affero General Public License v3.0
+(see the LICENSE file). Complete corresponding source code is available at:
+https://github.com/AKRA-off/ctrlx-os-snap-collection/tree/main/ctrlX-vision-obb
+
+The bundled model weights (*.pt, *.onnx) were created with Ultralytics YOLO
+(AGPL-3.0, https://ultralytics.com/license) and are distributed under AGPL-3.0.
+If you cannot comply with AGPL-3.0 (for example when integrating into
+proprietary machine software), an Ultralytics Enterprise License is required.
+
+If this snap offers a network interface to users, the source code link above
+must remain accessible to those users (AGPL-3.0 section 13).
+
+The roLabelImg/ subfolder is a modified copy of roLabelImg
+(https://github.com/cgvict/roLabelImg), itself derived from labelImg
+(https://github.com/tzutalin/labelImg). Both are MIT-licensed; see
+roLabelImg/LICENSE. It uses PyQt5 (GPL-3.0 / commercial), which is installed
+from PyPI and not stored here; a PyInstaller build bundles it, so that binary
+must be distributed under GPL-3.0-compatible terms (AGPL-3.0 here is fine).
+
+Datalayer binaries from Bosch Rexroth AG, if present, remain under their own
+terms and are not relicensed.

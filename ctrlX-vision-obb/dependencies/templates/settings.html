@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CtrlX YOLO Detection System - Settings</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{url_for('static', filename='bootstrap/bootstrap.min.css')}}" rel="stylesheet">
+  <link href="{{url_for('static', filename='bootstrap/main-style.css')}}" rel="stylesheet">
+  <script src="{{url_for('static', filename='bootstrap/bootstrap.bundle.min.js')}}"></script>
+</head>
+<body>
+
+<!-- Main Header -->
+<header class="main-header">
+  <div class="header-container">
+    <div class="logo-section">
+      <img src="{{url_for('static', filename='image/rexroth.png')}}" alt="Bosch Rexroth Logo" class="company-logo">
+    </div>
+    <div class="app-title">
+      <img src="{{url_for('static', filename='image/Ctrlx_automation2.png')}}" alt="CtrlX Logo" class="ctrlx-logo">
+      <h1>YOLO Detection System</h1>
+    </div>
+  </div>
+</header>
+
+<!-- Navigation -->
+<nav class="main-nav">
+  <div class="nav-container">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+      </li>
+      <li class="nav-item">
+        <a href="{{ url_for('settings') }}" class="nav-link active">Settings</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+
+<!-- Main Content -->
+<div class="main-content">
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <div class="settings-card">
+        <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+          <h2>Upload File</h2>
+          <input type="file" name="file" class="form-input">
+          <input type="hidden" name="dir_path" placeholder="Example: Test/">
+          <button type="submit" class="btn-white-custom" style="margin-top: 1rem;">Upload File</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+      <div class="settings-card">
+        <form action="{{ url_for('delete_file') }}" method="POST">
+          <h2>Delete File</h2>
+          <input type="text" name="file_path" placeholder="Example: test.onnx" class="form-input">
+          <button type="submit" class="btn-white-custom" style="margin-top: 1rem;">Delete File</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-md-12 mb-4">
+      <div class="settings-card-light">
+        <h2>Settings for Camera 1</h2>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <label for="processingModeSelect" class="form-label"><h4>Processing Mode ({{ processing_mode.title() }})</h4></label>
+              <select class="form-select" id="processingModeSelect" name="processing_mode">
+                <option selected>
+                  {% if processing_mode == 'segmentation' %}
+                    segmentation - Instance Segmentation
+                  {% elif processing_mode == 'obb' %}
+                    obb - Oriented Bounding Box Detection
+                  {% elif processing_mode == 'detection' %}
+                    detection - Object Detection
+                  {% endif %}
+                </option>
+                <option value="segmentation">segmentation - Instance Segmentation</option>
+                <option value="obb">obb - Oriented Bounding Box Detection</option>
+                <option value="detection">detection - Object Detection</option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Choose detection type for inference</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Select Model</h4>
+              <input type="text" value="" name="model_name" placeholder={{ model_name }} class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Class Names File</h4>
+              <input type="text" value="" name="class_yaml_name" placeholder="{{ class_yaml_name }}" class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Yaml with class names (upload any name, no renaming to data0.yaml needed).</p>
+          </div>
+
+          {% if processing_mode == 'obb' %}
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Heading Model (360&deg;)</h4>
+              <input type="text" value="" name="heading_model_name" placeholder={{ heading_model_name }} class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Heading classifier .onnx for 0&ndash;360&deg; angles. Enter "none" to disable (angles then 180&deg;-ambiguous). Runs on CPU in both inference modes.</p>
+          </div>
+          {% endif %}
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Object Confidence Threshold</h4>
+              <input type="text" value="" name="hmi_conf_thres" placeholder={{ hmi_conf_thres }} min="0.001" max="1" class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>IOU Threshold for NMS</h4>
+              <input type="text" value="" name="hmi_iou_thres" placeholder={{ hmi_iou_thres }} min="0.001" max="1" class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <label for="camSelect" class="form-label"><h4>Camera Selection ({{ variable }})</h4></label>
+              <select class="form-select" id="camSelect" name="variable">
+                <option selected>{% if variable == 0 %}
+                  0 - Hikrobot GiGE
+                    {% elif variable == 1 %}
+                  1 - USB Webcam
+                    {% elif variable == 3 %}
+                  3 - Preloaded Image
+                    {% endif %}
+                </option>
+                <option value="0">0 - Hikrobot GiGE</option>
+                <option value="1">1 - USB Webcam</option>
+                <option value="3">3 - Preloaded Image</option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Hikrobot(0) USB(1) Preloaded Image(3)</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>3D Viewer ({{ 'shown' if iframe_show else 'hidden' }})</h4>
+              <input type="text" value="" name="iframe_path" placeholder="{{ iframe_path }}" class="form-input">
+              <input type="hidden" name="iframe_set" value="1">
+              <input type="submit" class="btn-outline-custom" value="Set Path" style="margin-top: 0.5rem;">
+            </form>
+            <form action="{{ url_for('settings') }}" method="post" style="margin-top: 0.5rem;">
+              <select class="form-select" name="iframe_show">
+                <option value="{{ 1 if not iframe_show else 0 }}" selected>
+                  {{ 'Show viewer on home page' if not iframe_show else 'Hide viewer' }}
+                </option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Path on this device, e.g. 3dviewer/Demo?id=3dv1 &mdash; the browser's current host/IP is prepended automatically.</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <label for="hailoSelect" class="form-label"><h4>Inference Mode ({{ 'HAILO' if use_hailo else 'Standard ONNX' }})</h4></label>
+              <select class="form-select" id="hailoSelect" name="use_hailo">
+                <option selected>{% if use_hailo %}
+                  1 - HAILO Accelerator
+                    {% else %}
+                  0 - Standard ONNX
+                    {% endif %}
+                </option>
+                <option value="0">0 - Standard ONNX</option>
+                <option value="1">1 - HAILO Accelerator</option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">HAILO uses .hef models, Standard uses .onnx models</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <label class="form-label"><h4>Lighting Normalization / CLAHE ({{ 'ON' if use_clahe else 'OFF' }})</h4></label>
+              <select class="form-select" name="use_clahe">
+                <option value="{{ 1 if not use_clahe else 0 }}" selected>
+                  {{ 'Switch ON' if not use_clahe else 'Switch OFF' }}
+                </option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Normalizes contrast for variable lighting. Enable ONLY with a model trained on CLAHE data.</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <label class="form-label"><h4>Training-Data Logger ({{ 'ON' if logger_enabled else 'OFF' }})</h4></label>
+              <select class="form-select" name="logger_enabled">
+                <option value="{{ 1 if not logger_enabled else 0 }}" selected>
+                  {{ 'Switch ON' if not logger_enabled else 'Switch OFF' }}
+                </option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Saves every raw capture to <code>&lt;path&gt;/Logger/Shot</code> and the annotated result to <code>&lt;path&gt;/Logger/Process</code> for later collection of missed detections.</p>
+
+            <form action="{{ url_for('settings') }}" method="post" style="margin-top: 0.75rem;">
+              <label class="form-label"><h4>Logger Path</h4></label>
+              <input type="text" class="form-control" name="logger_path" value="{{ logger_path }}" placeholder="(default: media/solutions folder)">
+              <input type="submit" class="btn-outline-custom" value="Save Path" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Leave empty to use the default media folder. Set to a removable-media mount (e.g. <code>/media/&lt;user&gt;/&lt;usb&gt;</code>) to log to external storage.</p>
+          </div>
+        </div>
+
+        {% if variable == 0 %}
+        <div class="row">
+          <div class="col-md-12">
+            <h4>Manage Camera Connection</h4>
+            {% if hik_connected == 0 %}
+            <form action="{{ url_for('settings') }}" method="post">
+              <input type="hidden" value="1" name="conn_hik" placeholder="">
+              <input type="submit" class="btn-primary-custom" value="Connect Camera">
+            </form>
+            {% endif %}
+            {% if hik_connected == 1 %}
+            <form action="{{ url_for('settings') }}" method="post">
+              <input type="hidden" value="1" name="disc_hik" placeholder="">
+              <input type="submit" class="btn-secondary-custom" value="Disconnect Camera">
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if variable == 1 %}
+        <div class="row">
+          <div class="col-md-12">
+            <h3>Webcam Settings</h3>
+            <p style="color: var(--medium-gray);">Device is automatically detected</p>
+          </div>
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Webcam Width (pixels)</h4>
+              <input type="text" value="" name="webcam_width" placeholder={{ webcam_width }} min="320" max="3840" step="1" class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+          </div>
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Webcam Height (pixels)</h4>
+              <input type="text" value="" name="webcam_height" placeholder={{ webcam_height }} min="240" max="2160" step="1" class="form-input">
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-md-12 mb-4">
+      <div class="settings-card-light">
+        <h2>Calibration (pixels &rarr; mm)</h2>
+        <p style="color: var(--medium-gray);">Place a chessboard flat on the work plane at the height of the object tops. Status:
+          {% if calib_exists %}
+            <strong style="color: var(--success-green);">calibrated</strong>
+            ({{ calib_meta.get('saved', '?') }}, board RMS {{ calib_meta.get('rms_board_mm', '?') }} mm)
+          {% else %}
+            <strong style="color: var(--accent-orange);">not calibrated</strong>
+          {% endif %}
+          &mdash; publishing {{ 'millimeters' if (use_calibration and calib_exists) else 'pixels' }}.
+        </p>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>1. Detect Chessboard</h4>
+              <label>Inner corners W x H, square size (mm):</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <input type="text" name="calib_pw" value="{{ calib_pattern_w }}" class="form-input" style="width: 5rem;">
+                <input type="text" name="calib_ph" value="{{ calib_pattern_h }}" class="form-input" style="width: 5rem;">
+                <input type="text" name="calib_sq" value="{{ calib_square_mm }}" class="form-input" style="width: 7rem;">
+              </div>
+              <input type="hidden" name="calib_detect" value="1">
+              <input type="submit" class="btn-outline-custom" value="Capture &amp; Detect Board" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Takes a shot with the selected camera and finds the corners.</p>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Use Calibration ({{ 'ON - mm' if use_calibration else 'OFF - pixels' }})</h4>
+              <select class="form-select" name="use_calibration">
+                <option value="{{ 1 if not use_calibration else 0 }}" selected>
+                  {{ 'Switch ON (publish mm)' if not use_calibration else 'Switch OFF (publish pixels)' }}
+                </option>
+              </select>
+              <input type="submit" class="btn-outline-custom" value="Change" style="margin-top: 0.5rem;">
+            </form>
+            {% if calib_exists %}
+            <form action="{{ url_for('settings') }}" method="post" style="margin-top: 0.5rem;">
+              <input type="hidden" name="calib_clear" value="1">
+              <input type="submit" class="btn-outline-custom" value="Clear Calibration">
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if calib_exists and calib_meta.get('world_table') and not calib_pending %}
+        <div class="row">
+          {% if calib_photo %}
+          <div class="col-md-6 mb-3">
+            <h4>Calibrated board</h4>
+            <img src="{{ url_for('download_file', filename='calibsaved0.jpg') }}" style="max-width: 100%; border-radius: 5px;" alt="saved calibration board">
+          </div>
+          {% endif %}
+          <div class="col-md-6 mb-3">
+            <form action="{{ url_for('settings') }}" method="post">
+              <h4>Re-adjust World Coordinates (mm)</h4>
+              <table>
+                {% for lbl in ['TL', 'TR', 'BL', 'BR'] %}
+                <tr>
+                  <td style="padding: 0.2rem 0.6rem;"><strong>{{ lbl }}</strong></td>
+                  <td><input type="text" name="calib_{{ lbl }}_x" value="{{ calib_meta['world_table'][lbl][0] }}" class="form-input" style="width: 7rem;"></td>
+                  <td><input type="text" name="calib_{{ lbl }}_y" value="{{ calib_meta['world_table'][lbl][1] }}" class="form-input" style="width: 7rem;"></td>
+                </tr>
+                {% endfor %}
+              </table>
+              <input type="hidden" name="calib_adjust" value="1">
+              <input type="submit" class="btn-outline-custom" value="Apply Adjustment" style="margin-top: 0.5rem;">
+            </form>
+            <p style="margin-top: 0.5rem; color: var(--medium-gray);">Edit and apply to re-anchor the saved calibration (offset/rotation) &mdash; no new board shot needed.</p>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if calib_pending %}
+          {% if calib_pending.get('error') %}
+          <p style="color: var(--accent-orange);"><strong>Detection failed:</strong> {{ calib_pending['error'] }}</p>
+          {% else %}
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <h4>Detected board</h4>
+              <img src="{{ url_for('download_file', filename='calibprev0.jpg') }}" style="max-width: 100%; border-radius: 5px;" alt="calibration preview">
+            </div>
+            <div class="col-md-6 mb-3">
+              <form action="{{ url_for('settings') }}" method="post">
+                <h4>2. World coordinates of the labeled corners (mm)</h4>
+                <p style="color: var(--medium-gray);">Prefilled with board-frame values. Adjust to your machine/robot frame; offset and rotation are computed automatically.</p>
+                <table>
+                  {% for lbl in ['TL', 'TR', 'BL', 'BR'] %}
+                  <tr>
+                    <td style="padding: 0.2rem 0.6rem;"><strong>{{ lbl }}</strong></td>
+                    <td><input type="text" name="calib_{{ lbl }}_x" value="{{ calib_pending['table'][lbl][0] }}" class="form-input" style="width: 7rem;"> </td>
+                    <td><input type="text" name="calib_{{ lbl }}_y" value="{{ calib_pending['table'][lbl][1] }}" class="form-input" style="width: 7rem;"></td>
+                  </tr>
+                  {% endfor %}
+                </table>
+                <input type="hidden" name="calib_save" value="1">
+                <input type="submit" class="btn-primary-custom" value="3. Save Calibration" style="margin-top: 0.5rem;">
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-md-12 mb-4">
+      <div class="settings-card">
+        <h2>Files in Snap Folder</h2>
+        {% if files %}
+        <ul class="file-list">
+          {% for file in files %}
+          <li>{{ file }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color: rgba(255,255,255,0.7);">No files found in Snap folder</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Settings Button - Fixed at Bottom -->
+<div class="save-settings-container">
+  <form action="{{ url_for('settings') }}" method="post">
+    <input type="hidden" value="1" name="save_config" placeholder="">
+    <input type="submit" class="save-settings-btn" value="💾 Save All Settings">
+  </form>
+</div>
+
+<!-- Footer -->
+<footer class="main-footer">
+  <p>&copy; 2025 Bosch Rexroth</p>
+</footer>
+
+ </body>
+ </html>

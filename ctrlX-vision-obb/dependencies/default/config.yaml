@@ -1,0 +1,18 @@
+maintainer: Akra
+cameras: 1
+cam_select:
+  First: 3
+conf_thres:
+  First: 0.3
+iou_thres:
+  First: 0.5
+onnx:
+  First: shrimpBT_131025_2_merge.onnx
+boschrexroth: boschrexroth
+webcam_width:
+  First: 1280
+webcam_height:
+  First: 720
+pixel_scale: 1.0
+use_hailo:
+  First: false

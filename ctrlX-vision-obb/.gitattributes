@@ -1,0 +1,8 @@
+# The snap runs these on Linux - line endings must stay LF even when
+# the repo is edited on Windows (a CRLF shebang breaks systemd startup:
+# "/usr/bin/env: 'python3\r': No such file or directory")
+*.py text eol=lf
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+snap/hooks/* text eol=lf

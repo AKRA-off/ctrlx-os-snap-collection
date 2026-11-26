@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.boschrexroth.com/ctrlx-automation/ctrlx-core/apps/package-manifest/package-manifest.v1.1.schema.json",
+  "version": "1.0.0",
+  "id": "AI_Detector",
+  "configuration": {
+    "appDirectories": [
+      {
+        "name": "AI_Detector",
+        "description": "ctrlX AI Detector (YOLO detection, OBB 360)",
+        "icon": "bosch-ic-video-sensor",
+        "copyOnLoad": true
+      }
+    ]
+  },
+  "services": {
+    "proxyMapping": [
+      {
+        "binding": ":8021",
+        "name": "ai-detector-3.web",
+        "url": "/aidetector"
+      }
+    ]
+  },
+  "menus": {
+    "sidebar": [
+      {
+        "id": "AI_Detector_sidebar",
+        "title": "Ctrlx AI Detector",
+        "icon": "bosch-ic-video-sensor",
+        "items": [
+          {
+            "id": "AI_Detector",
+            "target": "_blank",
+            "title": "Webpage",
+            "icon": "bosch-ic-video-sensor",
+            "link": "/aidetector/"
+          }
+        ]
+      }
+    ],
+    "settings": [
+    ],
+    "overview": [
+      {
+        "id": "AI_Detector",
+        "target": "_blank",
+        "title": "Ctrlx AI Detector",
+        "icon": "bosch-ic-video-sensor",
+        "link": "/aidetector/"
+      }
+    ]    
+  }
+}

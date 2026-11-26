@@ -1,0 +1,1658 @@
+#!/usr/bin/env python3
+# -- coding: utf-8 --
+
+# SPDX-FileCopyrightText: Bosch Rexroth AG
+#
+# SPDX-License-Identifier: MIT
+
+import signal
+import time
+import sys
+import threading
+import termios
+import os
+from datetime import datetime
+from typing import List
+
+from flask import Flask, request, render_template, redirect, send_from_directory, Response, stream_with_context, url_for
+import shutil
+#import config
+
+import onnxruntime
+import numpy as np
+import cv2
+import argparse
+
+import subprocess
+
+import csv
+
+#from pypylon import pylon, genicam #Basler
+#from utils import xywh2xyxy, draw_detections, multiclass_nms, class_init
+from yoloseg.utils import xywh2xyxy, nms, draw_detections, sigmoid, class_init
+
+
+from waitress import serve
+from gevent import pywsgi
+
+import yaml
+
+from ctypes import *
+
+from MVImport.MvCameraControl_class import *
+from helper.ctrlx_datalayer_helper import get_client
+from helper.ctrlx_datalayer_helper import get_provider
+
+import logging
+from time import time
+from time import sleep, perf_counter
+from math import atan2, cos, sin, sqrt, pi, tan, radians, degrees, hypot, dist, pi, ceil
+
+#from pyModbusTCP.server import ModbusServer, DataBank
+from pyModbusTCP.server import ModbusServer
+
+
+import ctrlxdatalayer
+import flatbuffers
+
+from comm.datalayer import DisplayFormat, Metadata, NodeClass
+from ctrlxdatalayer.provider import Provider
+from ctrlxdatalayer.provider_node import (
+    ProviderNode,
+    ProviderNodeCallbacks,
+    NodeCallback,
+)
+from ctrlxdatalayer.variant import Result, Variant
+from ctrlxdatalayer.metadata_utils import (
+    MetadataBuilder,
+    AllowedOperation,
+    ReferenceType,
+)
+
+from ctrlxdatalayer.variant import Result, Variant, VariantType
+import random
+from ctrlxdatalayer.provider import Provider
+
+
+from datetime import datetime
+
+
+from yoloseg.YOLOSeg import YOLOSeg
+import glob
+
+from instance_segmentation import run_inference_pipeline
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+__close_app = False
+
+
+global g_numArray
+g_numArray = None
+
+address_base = "AI_Detector/data/"
+
+MEDIA_FOLDER = '/var/snap/rexroth-solutions/common/solutions/activeConfiguration/AI_Detector/'
+general_path = '/var/snap/rexroth-solutions/common/solutions/activeConfiguration/AI_Detector/'
+
+#MEDIA_FOLDER = '/snap/ai-detector/current/'
+#general_path = '/snap/ai-detector/current/'
+
+
+variable = [99, 99, 99, 99, 99] #
+bool_flask = [0, 0, 0, 0, 0]
+model_name = [".onnx", ".onnx", ".onnx", ".onnx", ".onnx"]
+model_name_temp = [".onnx", ".onnx", ".onnx", ".onnx", ".onnx"]
+
+output_boxes0 = [0.0, 0.0, 0.0, 0.0, 0.0]
+output_score0 = [0.0, 0.0, 0.0, 0.0, 0.0]
+output_classes0 = [1,1,1,1,1]
+output_length = []
+output_weight = []
+output_qty = 0
+
+initialize_var = True
+hmi_conf_thres = [0.3, 0.3, 0.3, 0.3, 0.3]
+hmi_iou_thres = [0.5, 0.5, 0.5, 0.5, 0.5]
+hmi_password = "boschrexroth"
+hmi_password_temp = ""
+disc_hik = [0, 0, 0, 0, 0]
+conn_hik = [0, 0, 0, 0, 0]
+time_toweb = [0.0, 0,0, 0,0, 0,0, 0,0]
+time_start = 0
+save_config = 0
+camera_qty = 1
+hmi_cam_settings = [0, 0, 0, 0, 0]
+step = 99
+log=0
+hik_connected=0
+hik_conn_arr = [0,0,0,0,0]
+web_conn_arr = [0,0,0,0,0]
+hik_counter = 0
+web_counter = 0
+webcam_width = [1280, 1280, 1280, 1280, 1280]
+webcam_height = [720, 720, 720, 720, 720]
+
+# Pixel scale settings for converting pixels to real-world units (mm/pixel)
+pixel_scale = 1.0  # Scale factor for length measurements (mm/pixel)
+
+# HAILO accelerator settings
+use_hailo = [False, False, False, False, False]  # Enable/disable HAILO mode per camera
+
+# Weight calculation functions
+def load_weight_data():
+    """Load weight data from CSV file and return sorted arrays"""
+    
+    csv_path = general_path + 'weight.csv'
+    lengths = []
+    weights = []
+
+    try:
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    length = float(row['Length(mm)'])
+                    weight = float(row['Weight(g)'])
+                    lengths.append(length)
+                    weights.append(weight)
+                except (ValueError, KeyError):
+                    continue
+
+        # Sort by length
+        if lengths:
+            sorted_data = sorted(zip(lengths, weights))
+            lengths, weights = zip(*sorted_data)
+            return list(lengths), list(weights)
+    except FileNotFoundError:
+        logger.warning(f"Weight CSV file not found at {csv_path}")
+
+    return [], []
+
+def interpolate_weight(length_mm, ref_lengths, ref_weights):
+    """Calculate weight for a given length using linear interpolation"""
+    if not ref_lengths or not ref_weights:
+        return 0.0
+
+    # If length is below minimum, use minimum weight
+    if length_mm <= ref_lengths[0]:
+        return ref_weights[0]
+
+    # If length is above maximum, use maximum weight
+    if length_mm >= ref_lengths[-1]:
+        return ref_weights[-1]
+
+    # Find the two points to interpolate between
+    for i in range(len(ref_lengths) - 1):
+        if ref_lengths[i] <= length_mm <= ref_lengths[i + 1]:
+            # Linear interpolation
+            x0, x1 = ref_lengths[i], ref_lengths[i + 1]
+            y0, y1 = ref_weights[i], ref_weights[i + 1]
+            weight = y0 + (y1 - y0) * (length_mm - x0) / (x1 - x0)
+            return round(weight, 2)
+
+    return 0.0
+
+def calculate_weights_for_lengths(lengths):
+    """Calculate weights for all detected lengths"""
+    ref_lengths, ref_weights = load_weight_data()
+    weights = []
+
+    for length in lengths:
+        weight = interpolate_weight(length, ref_lengths, ref_weights)
+        weights.append(weight)
+
+    return weights
+
+def calculate_statistics(lengths, weights):
+    """Calculate average length and count per 1kg"""
+    if not lengths or not weights:
+        return 0.0, 0
+
+    avg_length = sum(lengths) / len(lengths)
+    avg_weight = sum(weights) / len(weights)
+
+    # Calculate how many shrimps of average size in 1kg (1000g)
+    count_per_kg = 0
+    if avg_weight > 0:
+        count_per_kg = int(1000.0 / avg_weight)
+
+    return round(avg_length, 2), count_per_kg
+
+
+app = Flask(__name__)
+app.secret_key = b'_1#y2l"F4Q8z\n\xec]/'
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
+
+@app.route('/uploads/<path:filename>')
+def download_file(filename):
+    return send_from_directory(MEDIA_FOLDER, filename, as_attachment=True)
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    global log
+    log = 0
+    return render_template("login.html")
+
+
+@app.route("/login_post", methods=["POST", "GET"])
+def login_post():
+    flash_data = "error"
+    global hmi_password
+    if request.method == "POST":
+        user = request.form["email"]
+        pass1 = request.form["password"]
+        if user:
+            if (user == "boschrexroth" and pass1==hmi_password) or (user == "admin" and pass1=="br3xr0th@(_&^#$"):
+                global log
+                log = 1
+                return redirect(url_for("index"))
+            else:
+                return render_template("login.html", result=flash_data)
+        else:
+            return render_template("login.html", result=flash_data)
+@app.route('/index', methods=['GET', 'POST'])
+def index():
+    global time_toweb
+    global log
+    global bool_flask
+    global hmi_password
+    global camera_qty
+    global output_length
+    global output_weight
+
+    if log == 0:
+        return render_template("login.html")
+    else:
+        if request.method == "POST":
+            try:
+                if request.form.get("bool_flask"):
+                    bool_flask[0] = int(request.form.get("bool_flask"))
+                    return redirect(url_for("index"))
+                elif request.form.get("time_toweb"):
+                    time_toweb[0] = float(request.form.get("time_toweb"))
+                    return redirect(url_for("settings"))
+
+            except:
+                print("Wrong data type")
+            return redirect(url_for("index"))
+
+        ##
+
+        # Calculate weights and statistics
+        weights = calculate_weights_for_lengths(output_length)
+        avg_length, count_per_kg = calculate_statistics(output_length, weights)
+
+        # Create list of tuples for template
+        shrimp_data = list(zip(output_length, weights)) if output_length else []
+
+        return render_template('index.html',
+                             bool_flask=bool_flask[0],
+                             time_toweb=time_toweb[0],
+                             shrimp_data=shrimp_data,
+                             avg_length=avg_length,
+                             count_per_kg=count_per_kg)
+
+@app.route('/api/detection_data', methods=['GET'])
+def get_detection_data():
+    """API endpoint to get current detection data"""
+    global output_length
+    global bool_flask
+    global time_toweb
+
+    weights = calculate_weights_for_lengths(output_length)
+    avg_length, count_per_kg = calculate_statistics(output_length, weights)
+
+    return {
+        'is_processing': bool_flask[0] == 1,
+        'time_toweb': time_toweb[0],
+        'shrimp_data': [[length, weight] for length, weight in zip(output_length, weights)],
+        'avg_length': avg_length,
+        'count_per_kg': count_per_kg,
+        'timestamp': time()
+    }
+
+#
+@app.route("/settings", methods=['GET', 'POST'])
+def settings():
+    global variable
+    global bool_flask
+    global model_name
+    global model_name_temp
+    global hmi_conf_thres
+    global hmi_iou_thres
+    global log
+    global hmi_password
+    global disc_hik
+    global conn_hik
+    global save_config
+    global camera_qty
+    global hmi_cam_settings
+    global MEDIA_FOLDER
+    global hik_connected
+    global web_conn_arr
+    global initialize_var
+    global webcam_width
+    global webcam_height
+    global pixel_scale
+    global use_hailo
+
+
+    abs_folder_path = general_path
+
+    # Create lists to store directories, subdirectories, and files
+    directories = []
+    subdirectories = []
+    files = []
+    if log == 0:
+        return render_template("login.html")
+    else:
+        # Loop through each item in the folder
+        for item in os.listdir(abs_folder_path):
+            # Get the absolute path of the item
+            abs_item_path = os.path.join(abs_folder_path, item)
+    
+            # Check if the item is a directory or a file
+            if os.path.isdir(abs_item_path):
+                # Add the directory name to the directories list
+                directories.append(item)
+            else:
+                # Add the file name to the files list
+                files.append(item)
+    
+        # Loop through each directory in the folder
+        for directory in directories:
+            # Get the absolute path of the subdirectory
+            abs_subdirectory_path = os.path.join(abs_folder_path, directory)
+    
+            # Loop through each item in the subdirectory
+            for item in os.listdir(abs_subdirectory_path):
+                # Get the absolute path of the item
+                abs_item_path = os.path.join(abs_subdirectory_path, item)
+    
+                # Check if the item is a directory or a file
+                if os.path.isdir(abs_item_path):
+                    # Add the subdirectory path to the subdirectories list
+                    subdirectories.append(os.path.join(directory, item))
+                else:
+                    # Add the file path to the files list
+                    files.append(os.path.join(directory, item))
+        
+        if request.method == "POST" and not initialize_var:
+            try:
+                if request.form.get("variable"):
+                    variable[0] = int(request.form.get("variable"))
+                    #return redirect('/')  url_for("settings")
+                    return redirect(url_for("settings"))
+                elif request.form.get("model_name"):
+                    tempstr = str(request.form.get("model_name"))
+                    if os.path.exists(MEDIA_FOLDER + tempstr):
+                        model_name[0] = tempstr
+                    else:
+                        print("No Model File found in Directory, keeping default")
+                        model_name[0] = "yolov8n-seg.onnx"                  
+                    return redirect(url_for("settings"))
+                elif request.form.get("bool_flask"):
+                    bool_flask[0]= int(request.form.get("bool_flask"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("hmi_conf_thres"):
+                    hmi_conf_thres[0] = float(request.form.get("hmi_conf_thres"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("hmi_iou_thres"):
+                    hmi_iou_thres[0] = float(request.form.get("hmi_iou_thres"))
+                    return redirect(url_for("settings")) 
+                elif request.form.get("hmi_password"):       
+                    hmi_password = str(request.form.get("hmi_password"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("disc_hik"):
+                    disc_hik[0] = int(request.form.get("disc_hik"))
+                    return redirect(url_for("settings"))    
+                elif request.form.get("conn_hik"):
+                    conn_hik[0] = int(request.form.get("conn_hik"))
+                    return redirect(url_for("settings"))  
+                elif request.form.get("save_config"):
+                    save_config = int(request.form.get("save_config"))
+                    return redirect(url_for("settings"))    
+                elif request.form.get("camera_qty"):
+                    camera_qty = int(request.form.get("camera_qty"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("hmi_cam_settings"):
+                    hmi_cam_settings[0] = int(request.form.get("hmi_cam_settings"))
+                    return redirect(url_for("settings"))    
+
+                    
+                elif request.form.get("hik_connected"):
+                    hik_connected = int(request.form.get("hik_connected"))
+                    return redirect(url_for("settings"))
+
+                elif request.form.get("web_conn_arr"):
+                    web_conn_arr[0] = int(request.form.get("web_conn_arr"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("webcam_width"):
+                    webcam_width[0] = int(request.form.get("webcam_width"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("webcam_height"):
+                    webcam_height[0] = int(request.form.get("webcam_height"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("pixel_scale"):
+                    pixel_scale = float(request.form.get("pixel_scale"))
+                    return redirect(url_for("settings"))
+                elif request.form.get("use_hailo") is not None:
+                    use_hailo[0] = int(request.form.get("use_hailo")) == 1
+                    return redirect(url_for("settings"))
+
+
+
+            except:
+                print("Wrong data type")
+            return redirect(url_for("settings"))
+
+        ##
+
+        return render_template('settings.html', hik_connected=hik_connected, web_conn_arr=web_conn_arr[0], bool_flask=bool_flask[0], variable=variable[0], model_name=model_name[0], directories=directories, subdirectories=subdirectories, files=files, hmi_conf_thres=hmi_conf_thres[0], hmi_iou_thres=hmi_iou_thres[0], hmi_password=hmi_password, disc_hik=disc_hik[0], conn_hik=conn_hik[0], save_config=save_config, camera_qty=camera_qty, webcam_width=webcam_width[0], webcam_height=webcam_height[0], pixel_scale=pixel_scale, use_hailo=use_hailo[0])
+
+#Create new directory
+@app.route('/create_dir', methods=['POST'])
+def create_dir():
+    directory = request.form['dir_path']
+    dir_path = general_path + directory 
+    try:
+        os.makedirs(dir_path)
+        return redirect(url_for("settings"))
+    except:
+        return 'Unable to create directory'
+    
+#Delete directory    
+@app.route('/delete_dir', methods=['POST'])
+def delete_dir():
+    directory = request.form['dir_path']
+    dir_path = general_path + directory 
+    try:
+        shutil.rmtree(dir_path)
+        return redirect(url_for("settings"))
+    except:
+        return 'Unable to delete directory'
+
+#Upload file
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
+    file = request.files['file']
+    directory = request.form['dir_path']
+    dir_path = general_path + directory 
+    #dir_path = general_path
+    try:
+        file.save(os.path.join(dir_path, file.filename))
+        return redirect(url_for("settings"))
+    except:
+        return 'Unable to upload file'
+    
+#Delete file    
+@app.route('/delete_file', methods=['POST'])
+def delete_file():
+    directory = request.form['file_path']
+    file_path = general_path + directory 
+    try:
+        if file_path != (MEDIA_FOLDER + 'yolov8n-seg.onnx'):
+            print("Removing ", file_path)
+            os.remove(file_path)
+        else:
+            print("Cannot Remove Default Model yolov8n-seg.onnx")
+        return redirect(url_for("settings"))
+    except:
+        return 'Unable to delete file'
+
+
+def startApp():
+
+    #serve(app,host='0.0.0.0',port=8021)
+###cr
+    # Prefer HTTPS if cert and key are available, otherwise fall back to HTTP
+    port = int(os.environ.get("APP_PORT", "8021"))
+    cert_path = os.environ.get("SSL_CERT_FILE", os.path.join(MEDIA_FOLDER, "server.crt"))
+    key_path = os.environ.get("SSL_KEY_FILE", os.path.join(MEDIA_FOLDER, "server.key"))
+
+    try:
+        if os.path.exists(cert_path) and os.path.exists(key_path):
+            logger.info(f"Starting HTTPS server on port {port} (cert: {cert_path})")
+            http_server = pywsgi.WSGIServer(('0.0.0.0', port), app, keyfile=key_path, certfile=cert_path)
+            http_server.serve_forever()
+        else:
+            logger.warning("SSL cert/key not found. Starting HTTP server instead.")
+            serve(app, host='0.0.0.0', port=port)
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+
+
+def generate_self_signed_cert(common_name: str = "localhost", days: int = 825):
+    """
+    Generate a self-signed cert/key pair in MEDIA_FOLDER using openssl.
+    Returns (cert_path, key_path).
+    """
+    cert_path = os.path.join(MEDIA_FOLDER, "server.crt")
+    key_path = os.path.join(MEDIA_FOLDER, "server.key")
+
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        logger.info("Existing certificate and key found; skipping generation.")
+        return cert_path, key_path
+
+    os.makedirs(MEDIA_FOLDER, exist_ok=True)
+
+    subj = f"/CN={common_name}"
+    san = f"subjectAltName=DNS:{common_name},IP:127.0.0.1"
+
+    try:
+        # One-shot key + cert generation (OpenSSL 1.1.1+/3.0+ supports -addext)
+        subprocess.run([
+            "openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048",
+            "-keyout", key_path,
+            "-out", cert_path,
+            "-days", str(days),
+            "-subj", subj,
+            "-addext", san
+        ], check=True)
+        # Restrict key permissions
+        try:
+            os.chmod(key_path, 0o600)
+        except Exception:
+            pass
+        logger.info(f"Generated self-signed certificate at {cert_path}")
+        return cert_path, key_path
+    except FileNotFoundError:
+        raise RuntimeError("OpenSSL not available. Install openssl or provide SSL_CERT_FILE/SSL_KEY_FILE.")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"OpenSSL failed: {e}")
+
+
+@app.route('/generate_cert', methods=['POST'])
+def generate_cert_route():
+    global log
+    if log == 0:
+        return render_template("login.html")
+    cn = request.form.get('cn', 'localhost')
+    try:
+        generate_self_signed_cert(common_name=cn)
+        return redirect(url_for("settings"))
+    except Exception as e:
+        return f"Failed to generate certificate: {e}", 500
+###/cr
+
+
+
+class MyProviderNode:
+    """MyProviderNode"""
+
+    def __init__(self, provider: Provider, address: str, initialValue: Variant):
+        """__init__"""
+        self._cbs = ProviderNodeCallbacks(
+            self.__on_create,
+            self.__on_remove,
+            self.__on_browse,
+            self.__on_read,
+            self.__on_write,
+            self.__on_metadata,
+        )
+
+        self._providerNode = ProviderNode(self._cbs)
+
+        self._provider = provider
+        self._address = address
+        self._data = initialValue
+        self._metadata = MyProviderNode.__get_metadata(address)
+
+    @staticmethod
+    def __get_metadata(address: str) -> Variant:
+        builder = MetadataBuilder(
+            allowed=AllowedOperation.READ | AllowedOperation.WRITE
+        )
+        builder = builder.set_display_name(address)
+        builder = builder.set_node_class(NodeClass.NodeClass.Variable)
+        if address.rfind("string") != -1:
+            builder.add_reference(ReferenceType.read(), "types/datalayer/string")
+            builder.add_reference(ReferenceType.write(), "types/datalayer/string")
+        return builder.build()
+
+    def register_node(self):
+        """register_node"""
+        return self._provider.register_node(self._address, self._providerNode)
+
+    def unregister_node(self):
+        """unregister_node"""
+        self._provider.unregister_node(self._address)
+        self._metadata.close()
+        self._data.close()
+
+    def set_value(self, value: Variant):
+        """set_value"""
+        self._data = value
+
+    def __on_create(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_create"""
+        print("__on_create()", "address:", address, "userdata:", userdata, flush=True)
+        cb(Result.OK, data)
+
+    def __on_remove(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_remove"""
+        print("__on_remove()", "address:", address, "userdata:", userdata, flush=True)
+        cb(Result.UNSUPPORTED, None)
+
+    def __on_browse(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_browse"""
+        print("__on_browse()", "address:", address, "userdata:", userdata, flush=True)
+        with Variant() as new_data:
+            new_data.set_array_string([])
+            cb(Result.OK, new_data)
+
+    def __on_read(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_read
+        print(
+            "__on_read()",
+            "address:",
+            address,
+            "data:",
+            self._data,
+            "userdata:",
+            userdata,
+            flush=True,
+        )
+        """
+        new_data = self._data
+        cb(Result.OK, new_data)
+        
+    def __on_write(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        data: Variant,
+        cb: NodeCallback,
+    ):
+        """__on_write
+        print(
+            "__on_write()",
+            "address:",
+            address,
+            "data:",
+            data,
+            "userdata:",
+            userdata,
+            flush=True,
+        )
+        """
+        if self._data.get_type() != data.get_type():
+            cb(Result.TYPE_MISMATCH, None)
+            return
+
+        result, self._data = data.clone()
+        cb(Result.OK, self._data)
+
+    def __on_metadata(
+        self,
+        userdata: ctrlxdatalayer.clib.userData_c_void_p,
+        address: str,
+        cb: NodeCallback,
+    ):
+        """__on_metadata"""
+        #print("__on_metadata()", "address:", address, flush=True)
+        cb(Result.OK, self._metadata)  # Take metadata from metadata.mddb
+
+
+def handler(signum, frame):
+    """handler"""
+    global __close_app
+    __close_app = True
+    # print('Here you go signum: ', signum, __close_app, flush=True)
+
+
+def provide_string(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating string  provider node " + address_base + name, flush=True)
+    variantString = Variant()
+    variantString.set_string("myString")
+    provider_node_str = MyProviderNode(provider, address_base + name, variantString)
+    result = provider_node_str.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_str
+
+def provide_float(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating float  provider node " + address_base + name, flush=True)
+
+    global output_boxes0
+    variantFloat = Variant()
+    variantFloat.set_array_float32(output_boxes0)
+    provider_node_flt = MyProviderNode(provider, address_base + name, variantFloat)
+    result = provider_node_flt.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_flt
+
+
+def provide_float2(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating float  provider node " + address_base + name, flush=True)
+
+    global output_score0
+    variantFloat = Variant()
+    variantFloat.set_array_float32(output_score0)
+    provider_node_flt = MyProviderNode(provider, address_base + name, variantFloat)
+    result = provider_node_flt.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_flt
+
+
+def provide_bool(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating float  provider node " + address_base + name, flush=True)  
+    variantBool = Variant()
+    variantBool.set_bool8(False)
+    provider_node_bl = MyProviderNode(provider, address_base + name, variantBool)
+    result = provider_node_bl.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_bl
+
+def provide_int_arr(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating float  provider node " + address_base + name, flush=True)
+    global output_classes0    
+    variantFloat = Variant()
+    variantFloat.set_array_int16(output_classes0)
+    provider_node_flt = MyProviderNode(provider, address_base + name, variantFloat)
+    result = provider_node_flt.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_flt
+
+
+def provide_int(provider: ctrlxdatalayer.provider, name: str):
+    """provide_string"""
+    # Create and register simple string provider node
+    print("Creating float  provider node " + address_base + name, flush=True)
+    mode = 0
+    
+    variantFloat = Variant()
+    variantFloat.set_int16(mode)
+    provider_node_flt = MyProviderNode(provider, address_base + name, variantFloat)
+    result = provider_node_flt.register_node()
+    if result != ctrlxdatalayer.variant.Result.OK:
+        print(
+            "ERROR Registering node " + address_base + name + " failed with:",
+            result,
+            flush=True,
+        )
+
+    return provider_node_flt
+
+
+def create_var(var_name, var_value):
+    globals()[var_name] = var_value
+
+
+
+
+def dl_provider():
+       
+    ### Provider add
+    with ctrlxdatalayer.system.System("") as datalayer_system:
+        datalayer_system.start(False)
+
+        # ip="10.0.2.2", ssl_port=8443: ctrlX COREvirtual with port forwarding and default port mapping
+        provider, connection_string = get_provider(
+            datalayer_system, ip="192.168.1.1", user="boschrexroth", password="boschrexroth"
+        )
+        if provider is None:
+            print("ERROR Connecting", connection_string, "failed.", flush=True)
+            sys.exit(1)
+
+        with (
+            provider
+        ):  # provider.close() is called automatically when leaving with... block
+            result = provider.start()
+            if result != Result.OK:
+                print(
+                    "ERROR Starting ctrlX Data Layer Provider failed with:",
+                    result,
+                    flush=True,
+                )
+                return
+                
+
+            
+            
+            # Create nodes
+            provide_node_float = provide_float(provider, "output_length")
+            provide_node_int = provide_int(provider, "output_qty")      
+            provide_node_start = provide_bool(provider, "capture")
+            provide_node_error = provide_bool(provider, "capture_error")
+                       
+
+            print("INFO Running endless loop...", flush=True)
+            while provider.is_connected() and not __close_app:
+                sleep(1.0)  # Seconds
+
+            print("ERROR ctrlX Data Layer Provider is disconnected", flush=True)
+
+
+            
+            provide_node_float.unregister_node()
+            del provide_node_float
+            provide_node_int.unregister_node()
+            del provide_node_int
+            provide_node_start.unregister_node()
+            del provide_node_start
+            provide_node_error.unregister_node()
+            del provide_node_error
+
+                     
+            
+            #print("Unregistering", type_sampleSchema_inertialValue, end=" ", flush=True)
+            #result = provider.unregister_type(type_sampleSchema_inertialValue)
+            #print(result, flush=True)
+
+            print("Stopping ctrlX Data Layer provider:", end=" ", flush=True)
+            result = provider.stop()
+            print(result, flush=True)
+             
+            
+            
+        # Attention: Doesn't return if any provider or client instance is still running
+        stop_ok = datalayer_system.stop(False)
+        print("System Stop", stop_ok, flush=True)
+    ###Provider
+   
+    
+def dl_client():
+     global output_boxes0
+     global output_score0
+     global output_classes0
+     global output_length
+     global output_qty
+
+     with ctrlxdatalayer.system.System("") as datalayer_system:
+        
+        datalayer_system.start(False)
+
+        datalayer_client, datalayer_client_connection_string = get_client(
+            datalayer_system, ip="192.168.1.1", user="boschrexroth", password="boschrexroth"
+        )
+        if datalayer_client is None:
+            print(
+                f"ERROR Connecting {datalayer_client_connection_string} failed.",
+                flush=True
+            )
+            sys.exit(1)
+
+        with (
+            datalayer_client
+        ):  # datalayer_client is closed automatically when leaving with block
+            if datalayer_client.is_connected() is False:
+                print(f"ERROR ctrlX Data Layer is NOT connected: {datalayer_client_connection_string}",
+                    flush=True
+                )
+                sys.exit(1)
+
+            while datalayer_client.is_connected() and not __close_app:
+                dt_str = datetime.now().strftime("%H:%M:%S.%f")
+
+               
+                with Variant() as data:
+
+                    
+                    data.set_array_float32(output_length)
+                    addr = "AI_Detector/data/output_length"
+                    result = datalayer_client.write_sync(addr, data)
+
+                    data.set_int16(output_qty)
+                    addr = "AI_Detector/data/output_qty"
+                    result = datalayer_client.write_sync(addr, data)
+                
+        
+                sleep(1.0)
+                
+
+            print("ERROR ctrlX Data Layer is NOT connected")
+
+        stop_ok = datalayer_system.stop(
+            False
+        )  # Attention: Doesn't return if any provider or client instance is still running
+        print("System Stop", stop_ok, flush=True)
+      
+
+# Mono图像转为python数组
+def Mono_numpy(data, nWidth, nHeight):
+    data_ = np.frombuffer(data, count=int(nWidth * nHeight), dtype=np.uint8, offset=0)
+    data_mono_arr = data_.reshape(nWidth, nHeight)
+    numArray = np.zeros([nWidth, nHeight, 1], "uint8")
+    numArray[:, :, 0] = data_mono_arr
+    return numArray
+
+
+# 彩色图像转为python数组
+def Color_numpy(data, nWidth, nHeight):
+    data_ = np.frombuffer(data, count=int(nWidth * nHeight * 3), dtype=np.uint8, offset=0)
+    data_r = data_[0:nWidth * nHeight * 3:3]
+    data_g = data_[1:nWidth * nHeight * 3:3]
+    data_b = data_[2:nWidth * nHeight * 3:3]
+
+    data_r_arr = data_r.reshape(nWidth, nHeight)
+    data_g_arr = data_g.reshape(nWidth, nHeight)
+    data_b_arr = data_b.reshape(nWidth, nHeight)
+    numArray = np.zeros([nWidth, nHeight, 3], "uint8")
+
+    numArray[:, :, 0] = data_r_arr
+    numArray[:, :, 1] = data_g_arr
+    numArray[:, :, 2] = data_b_arr
+    return numArray
+
+def press_any_key_exit():
+    fd = sys.stdin.fileno()
+    old_ttyinfo = termios.tcgetattr(fd)
+    new_ttyinfo = old_ttyinfo[:]
+    new_ttyinfo[3] &= ~termios.ICANON
+    new_ttyinfo[3] &= ~termios.ECHO
+    #sys.stdout.write(msg)
+    #sys.stdout.flush()
+    termios.tcsetattr(fd, termios.TCSANOW, new_ttyinfo)
+    try:
+        os.read(fd, 7)
+    except:
+        pass
+    finally:
+        termios.tcsetattr(fd, termios.TCSANOW, old_ttyinfo)
+
+
+def find_working_webcam_device():
+    """
+    Searches /dev/video* and returns the first working device path.
+    """
+    for node in glob.glob("/dev/video*"):
+        cap = cv2.VideoCapture(node, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            continue
+        ret, _ = cap.read()
+        cap.release()
+        if ret:
+            print(f"Found working webcam device: {node}", flush=True)
+            return node
+    raise RuntimeError("No working video devices found")
+
+
+def init_webcam(device_path, width=1280, height=720, use_mjpeg=True):
+    """
+    Initialize webcam with specified settings.
+    """
+    cap = cv2.VideoCapture(device_path, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        raise RuntimeError(f"Camera {device_path} cannot be opened")
+
+    # Set resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+    # Set MJPEG mode
+    if use_mjpeg:
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        cap.set(cv2.CAP_PROP_FOURCC, fourcc)
+
+    print(f"Webcam initialized: {device_path} at {width}x{height}", flush=True)
+    return cap
+
+
+
+
+def sig():
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGABRT, handler)
+
+
+
+def camera_processing(j):
+
+    global time_start
+    global step
+    global hik_connected
+    global cam
+    global hik_conn_arr
+    global web_conn_arr
+    global hik_counter
+    global web_counter
+    global webcam_width
+    global webcam_height
+
+    if  conn_hik[j] == 1 and variable[j] == 0:
+                    
+        SDKVersion = MvCamera.MV_CC_GetSDKVersion()
+        print ("SDKVersion[0x%x]" % SDKVersion)
+    
+        deviceList = MV_CC_DEVICE_INFO_LIST()
+        tlayerType = MV_GIGE_DEVICE | MV_USB_DEVICE
+    
+        # ch:枚举设备 | en:Enum device
+        ret = MvCamera.MV_CC_EnumDevices(tlayerType, deviceList)
+        if ret != 0:
+            print ("enum devices fail! ret[0x%x]" % ret)
+            sys.exit()
+    
+        if deviceList.nDeviceNum == 0:
+            print ("find no device!")
+            sys.exit()
+    
+        print ("Find %d devices!" % deviceList.nDeviceNum)
+    
+        for i in range(0, deviceList.nDeviceNum):
+            mvcc_dev_info = cast(deviceList.pDeviceInfo[i], POINTER(MV_CC_DEVICE_INFO)).contents
+            if mvcc_dev_info.nTLayerType == MV_GIGE_DEVICE:
+                print ("\ngige device: [%d]" % i)
+                strModeName = ""
+                for per in mvcc_dev_info.SpecialInfo.stGigEInfo.chModelName:
+                    strModeName = strModeName + chr(per)
+                print ("device model name: %s" % strModeName)
+    
+                nip1 = ((mvcc_dev_info.SpecialInfo.stGigEInfo.nCurrentIp & 0xff000000) >> 24)
+                nip2 = ((mvcc_dev_info.SpecialInfo.stGigEInfo.nCurrentIp & 0x00ff0000) >> 16)
+                nip3 = ((mvcc_dev_info.SpecialInfo.stGigEInfo.nCurrentIp & 0x0000ff00) >> 8)
+                nip4 = (mvcc_dev_info.SpecialInfo.stGigEInfo.nCurrentIp & 0x000000ff)
+                print ("current ip: %d.%d.%d.%d\n" % (nip1, nip2, nip3, nip4))
+            elif mvcc_dev_info.nTLayerType == MV_USB_DEVICE:
+                print ("\nu3v device: [%d]" % i)
+                strModeName = ""
+                for per in mvcc_dev_info.SpecialInfo.stUsb3VInfo.chModelName:
+                    if per == 0:
+                        break
+                    strModeName = strModeName + chr(per)
+                print ("device model name: %s" % strModeName)
+    
+                strSerialNumber = ""
+                for per in mvcc_dev_info.SpecialInfo.stUsb3VInfo.chSerialNumber:
+                    if per == 0:
+                        break
+                    strSerialNumber = strSerialNumber + chr(per)
+                print ("user serial number: %s" % strSerialNumber)
+
+        counter = 0
+        for kk in range(5):
+            if hik_conn_arr[kk] == 1:
+                counter+=1
+
+        nConnectionNum = counter
+        hik_conn_arr[j] = 1
+
+        if int(nConnectionNum) >= deviceList.nDeviceNum:
+            print ("intput error!")
+            sys.exit()
+    
+        # ch:创建相机实例 | en:Creat Camera Object
+        cam = MvCamera()
+        
+    
+        # ch:选择设备并创建句柄| en:Select device and create handle
+        stDeviceList = cast(deviceList.pDeviceInfo[int(nConnectionNum)], POINTER(MV_CC_DEVICE_INFO)).contents
+    
+        ret = cam.MV_CC_CreateHandle(stDeviceList)
+        if ret != 0:
+            print ("create handle fail! ret[0x%x]" % ret)
+            sys.exit()
+    
+        # ch:打开设备 | en:Open device
+        ret = cam.MV_CC_OpenDevice(MV_ACCESS_Exclusive, 0)
+        if ret != 0:
+            print ("open device fail! ret[0x%x]" % ret)
+            sys.exit()
+    
+        # ch:探测网络最佳包大小(只对GigE相机有效) | en:Detection network optimal package size(It only works for the GigE camera)
+        if stDeviceList.nTLayerType == MV_GIGE_DEVICE:
+            nPacketSize = cam.MV_CC_GetOptimalPacketSize()
+            if int(nPacketSize) > 0:
+                ret = cam.MV_CC_SetIntValue("GevSCPSPacketSize",nPacketSize)
+                if ret != 0:
+                    print ("Warning: Set Packet Size fail! ret[0x%x]" % ret)
+            else:
+                print ("Warning: Get Packet Size fail! ret[0x%x]" % nPacketSize)
+    
+        # ch:设置触发模式为off | en:Set trigger mode as off
+        ret = cam.MV_CC_SetEnumValue("TriggerMode", MV_TRIGGER_MODE_OFF)
+        if ret != 0:
+            print ("set trigger mode fail! ret[0x%x]" % ret)
+            sys.exit()
+    
+        # ch:获取数据包大小 | en:Get payload size
+        stParam =  MVCC_INTVALUE()
+        memset(byref(stParam), 0, sizeof(MVCC_INTVALUE))
+    
+        ret = cam.MV_CC_GetIntValue("PayloadSize", stParam)
+        if ret != 0:
+            print ("get payload size fail! ret[0x%x]" % ret)
+            sys.exit()
+        nPayloadSize = stParam.nCurValue
+
+        conn_hik[j] = 0
+        hik_connected = 1
+        #READY TO GRAB
+
+    if bool_flask[j] == 1:
+        ###CAMERA###
+
+        print("Starting inference Number: ", j)
+        print("Starting inference Number: ", j)
+        print("Starting inference Number: ", j)
+        print("Starting inference Number: ", j)
+        print("Starting inference Number: ", j)
+
+
+
+        step = j
+    
+        class_init(j)
+        
+
+        
+        if variable[j] == 0 and conn_hik[j] == 0: #hik
+
+        
+            time_start = time() 
+            
+            # ch:开始取流 | en:Start grab image
+            ret = cam.MV_CC_StartGrabbing()
+            if ret != 0:
+                print ("start grabbing fail! ret[0x%x]" % ret)
+                sys.exit()
+        
+            stOutFrame = MV_FRAME_OUT()
+            memset(byref(stOutFrame), 0, sizeof(stOutFrame))
+        
+            ret = cam.MV_CC_GetImageBuffer(stOutFrame, 1000)
+            if None != stOutFrame.pBufAddr and 0 == ret:
+                print("get one frame: Width[%d], Height[%d], nFrameNum[%d],nFrameLen[%d]" % (
+                stOutFrame.stFrameInfo.nWidth, stOutFrame.stFrameInfo.nHeight, stOutFrame.stFrameInfo.nFrameNum,stOutFrame.stFrameInfo.nFrameLen))
+                
+                buf_cache = (c_ubyte * stOutFrame.stFrameInfo.nFrameLen)()
+                        # 图像数据拷贝
+                memmove(byref(buf_cache), stOutFrame.pBufAddr, stOutFrame.stFrameInfo.nFrameLen)
+                if PixelType_Gvsp_Mono8 == stOutFrame.stFrameInfo.enPixelType:
+                    g_numArray = Mono_numpy(buf_cache,stOutFrame.stFrameInfo.nWidth, stOutFrame.stFrameInfo.nHeight)
+                    g_numArray = g_numArray.reshape(stOutFrame.stFrameInfo.nHeight, stOutFrame.stFrameInfo.nWidth, 1)
+                elif PixelType_Gvsp_RGB8_Packed == stOutFrame.stFrameInfo.enPixelType:
+                    g_numArray = Color_numpy(buf_cache,stOutFrame.stFrameInfo.nWidth, stOutFrame.stFrameInfo.nHeight)
+                    g_numArray = g_numArray.reshape(stOutFrame.stFrameInfo.nHeight, stOutFrame.stFrameInfo.nWidth, 3)
+                else:
+                    print("Not Support")
+                    sys.exit()
+        
+                cv2.imwrite(MEDIA_FOLDER + "pre" + str(j) + ".jpg", g_numArray)
+                    
+                nRet = cam.MV_CC_FreeImageBuffer(stOutFrame)
+        
+            else:
+                print("no data[0x%x]" % ret)
+                
+            #print ("press a key to stop grabbing.")
+            #press_any_key_exit()
+        
+            # ch:停止取流 | en:Stop grab image
+            ret = cam.MV_CC_StopGrabbing()
+            if ret != 0:
+                print ("stop grabbing fail! ret[0x%x]" % ret)
+                del data_bufS
+                sys.exit()
+        
+        
+            
+            yolo_inf(j)
+    
+        elif variable[j] == 1:    #webcam
+
+            time_start = time()
+
+            # Find and initialize working webcam device
+            try:
+                webcam_device = find_working_webcam_device()
+                cap = init_webcam(webcam_device, width=webcam_width[j], height=webcam_height[j], use_mjpeg=True)
+
+                # Capture frame
+                ret, frame = cap.read()
+
+                if ret and frame is not None:
+                    # Save captured image
+                    cv2.imwrite(MEDIA_FOLDER + "pre" + str(j) + ".jpg", frame)
+                    print(f"Webcam image saved: pre{j}.jpg", flush=True)
+                else:
+                    print(f"Failed to capture frame from webcam", flush=True)
+
+                cap.release()
+                yolo_inf(j)
+
+            except RuntimeError as e:
+                print(f"Webcam error: {e}", flush=True)
+
+        elif variable[j] == 3:
+            
+            time_start = time()
+            
+            yolo_inf(j)
+
+            
+    if disc_hik[j] == 1 and conn_hik[j] == 0 and variable[j] == 1:
+    
+        # ch:关闭设备 | Close device
+        ret = cam.MV_CC_CloseDevice()
+        if ret != 0:
+            print ("close deivce fail! ret[0x%x]" % ret)
+            del data_buf
+            sys.exit()
+    
+        # ch:销毁句柄 | Destroy handle
+        ret = cam.MV_CC_DestroyHandle()
+        if ret != 0:
+            print ("destroy handle fail! ret[0x%x]" % ret)
+            del data_buf
+            sys.exit()
+    
+        disk_hik[j] = 0
+        hik_connected = 0
+
+
+def hailo_inf(camid):
+    """
+    Run HAILO accelerator inference using instance_segmentation module
+
+    Note: This function uses the run_inference_pipeline from instance_segmentation.py
+    The model file should be a .hef file (HAILO model format)
+
+    To fully utilize HAILO measurements, you may need to modify instance_segmentation.py
+    to return the detected measurements instead of just saving the output image.
+    """
+    global bool_flask
+    global MEDIA_FOLDER
+    global model_name
+    global time_start
+    global time_toweb
+    global output_length
+    global output_qty
+    global pixel_scale
+
+    output_length = []
+    output_qty = 0
+
+    # Model name should be .hef file for HAILO
+    model_path = MEDIA_FOLDER + model_name[camid]
+    input_image_path = MEDIA_FOLDER + "pre" + str(camid) + ".jpg"
+    output_dir = MEDIA_FOLDER + "hailo_output"
+
+    try:
+        # Import the HAILO inference pipeline
+        
+
+        # Create output directory if it doesn't exist
+        #os.makedirs(output_dir, exist_ok=True)
+
+        # Load labels from data yaml file (same as in utils.py class_init)
+        data_yaml_path = general_path + 'data' + str(camid) + '.yaml'
+        labels_list = []
+
+        try:
+            with open(data_yaml_path, encoding="utf8") as f:
+                yaml_data = yaml.safe_load(f)
+
+            for k in yaml_data['names'].values():
+                labels_list.append(k)
+
+            print(f"Loaded {len(labels_list)} labels from {data_yaml_path}", flush=True)
+        except Exception as e:
+            print(f"Warning: Could not load labels from {data_yaml_path}: {e}", flush=True)
+            labels_list = ["object"]  # Fallback to generic label
+
+        # Create a temporary labels file for HAILO pipeline
+        temp_labels_file = MEDIA_FOLDER + f"temp_labels_{camid}.txt"
+        with open(temp_labels_file, 'w') as f:
+            for label in labels_list:
+                f.write(f"{label}\n")
+
+        # Determine architecture from model name or use default
+        # You may want to add an architecture field to config.yaml
+        arch = "v8"  # Default to YOLOv8
+        if "yolov5" in model_name[camid].lower() or "v5" in model_name[camid].lower():
+            arch = "v5"
+        elif "fastsam" in model_name[camid].lower() or "fast" in model_name[camid].lower():
+            arch = "fast"
+
+        # Run HAILO inference pipeline
+        print(f"Running HAILO inference with model: {model_path}", flush=True)
+        run_inference_pipeline(
+            net=model_path,
+            input_path=input_image_path,
+            arch=arch,
+            batch_size=1,
+            labels_file=temp_labels_file,
+            output_dir=output_dir,
+            save_stream_output=True,
+            resolution="sd",
+            enable_tracking=False,
+            show_fps=False
+        )
+
+        # Clean up temp labels file
+        try:
+            os.remove(temp_labels_file)
+        except:
+            pass
+
+        # Find the output image and copy it to the expected location
+        output_image_path = MEDIA_FOLDER + "inf" + str(camid) + ".jpg"
+
+        # Look for the output file in the hailo_output directory
+        output_files = []
+        for ext in ['*.jpg', '*.png']:
+            output_files.extend(glob.glob(os.path.join(output_dir, ext)))
+
+        if output_files:
+            # Get the most recent output file
+            latest_output = max(output_files, key=os.path.getctime)
+            shutil.copy(latest_output, output_image_path)
+            print(f"HAILO output saved to: {output_image_path}", flush=True)
+        else:
+            print("Warning: No HAILO output image found", flush=True)
+            # Copy the input image as fallback
+            shutil.copy(input_image_path, output_image_path)
+
+        # TODO: Extract length measurements from HAILO output
+        # The instance_segmentation.py module needs to be modified to return
+        # the measurement data (output_length, output_qty) instead of just
+        # saving the visualization.
+        #
+        # For now, measurements will be empty when using HAILO mode.
+        # To implement this:
+        # 1. Modify instance_segmentation.py to return detection results
+        # 2. Extract axis_lengths data from the results
+        # 3. Calculate measurements using pixel_scale similar to standard ONNX path
+
+        time_end = time()
+        time_toweb[camid] = round(time_end - time_start, 3)
+        bool_flask[camid] = 0
+
+    except Exception as e:
+        print(f"HAILO inference error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        bool_flask[camid] = 0
+
+
+def yolo_inf(camid):
+
+    global bool_flask
+    global MEDIA_FOLDER
+    global model_name
+    global hmi_conf_thres
+    global hmi_iou_thres
+    global time_start
+    global time_toweb
+    global output_length
+    global output_qty
+    global pixel_scale
+    global use_hailo
+
+    # Check if HAILO mode is enabled
+    if use_hailo[camid]:
+        hailo_inf(camid)
+        return
+
+    #/var/snap/Srexroth-solutions/common/solutions/activeConfiguration/jupyterlab/Vision/
+    output_length = []
+    output_qty = 0
+
+    yoloseg = YOLOSeg(MEDIA_FOLDER + model_name[camid], conf_thres=hmi_conf_thres[camid], iou_thres=hmi_iou_thres[camid])
+    img = cv2.imread(MEDIA_FOLDER + "pre"+ str(camid) + ".jpg")
+
+    # Detect Objects
+    boxes, scores, class_ids, masks = yoloseg(img)
+
+    ###cr
+    # Retrieve polygons and rotated bounding boxes for each instance
+    polygons_per_instance = yoloseg.get_mask_polygons(min_area=20, approx_frac=0.01)
+    rotated_boxes = yoloseg.get_mask_bounding_boxes(rotated=True)
+    axis_lengths = yoloseg.get_mask_axis_length(use_all_mask_pixels=False)
+
+    # Example: print first instance details
+    if len(polygons_per_instance) > 0:
+        print("First instance polygons:")
+        for poly in polygons_per_instance[0]:
+            print(poly.tolist())
+    if len(rotated_boxes) > 0 and rotated_boxes[0] is not None:
+        print("First instance rotated box (4 points):")
+        print(np.array(rotated_boxes[0]).tolist())
+
+    # Print all instances
+    for i, info in enumerate(axis_lengths):
+        print(f"Instance {i}:")
+        if i < len(polygons_per_instance):
+            for poly in polygons_per_instance[i]:
+                print("  polygon:", poly.tolist())
+        if i < len(rotated_boxes) and rotated_boxes[i] is not None:
+            print("  rotated_box:", np.array(rotated_boxes[i]).tolist())
+        if info is not None:
+            # Get length in pixels
+            length_pixels = info.get('endpoint_length', info['length'])
+            # Convert to real-world units (mm) using pixel scale
+            length_mm = length_pixels * pixel_scale
+
+            print("  principal-axis length (pixels):", round(info['length'], 2))
+            print("  endpoint length (pixels):", round(length_pixels, 2))
+            print("  endpoint length (mm):", round(length_mm, 2))
+            print("  center:", tuple(round(v, 2) for v in info['center']))
+            print("  axis dir:", tuple(round(v, 4) for v in info['axis']))
+            print("  endpoints:", np.round(info['endpoints'], 2).tolist())
+
+            # Store the scaled measurement in mm
+            output_length.append(round(length_mm, 2))
+            output_qty = i+1
+    ###/cr
+
+    # Draw detections
+    combined_img = yoloseg.draw_masks(img)
+    # Also draw principal axes for each instance
+    combined_img = yoloseg.draw_axes(combined_img, color=(255, 255, 0), thickness=2, use_all_mask_pixels=False)
+
+    cv2.imwrite(MEDIA_FOLDER +"inf" + str(camid) + ".jpg", combined_img)
+
+    time_end = time()
+    time_toweb[camid] = round(time_end - time_start, 3)
+    
+    bool_flask[camid] = 0
+
+    
+
+def main():
+
+    global variable
+    global bool_flask
+    global MEDIA_FOLDER
+    global model_name
+    global model_name_temp
+    global initialize_var
+    global hmi_password
+    global hmi_password_temp
+    global disc_hik
+    global conn_hik
+    global time_toweb
+    global time_start
+    global hmi_conf_thres
+    global hmi_iou_thres
+    global save_config
+    global camera_qty
+    global hmi_cam_settings
+    global webcam_width
+    global webcam_height
+    global pixel_scale
+    global use_hailo
+
+    
+    
+    if initialize_var:
+
+        with open(MEDIA_FOLDER + "config.yaml") as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
+            print(cfg)
+
+            hmi_password = cfg["boschrexroth"]
+            camera_qty = cfg["cameras"]
+            
+            hmi_password_temp = hmi_password
+
+            psstr = "First"
+
+            model_name[0] = cfg["onnx"][psstr]
+            variable[0] = cfg["cam_select"][psstr]
+            hmi_conf_thres[0] = cfg["conf_thres"][psstr]
+            hmi_iou_thres[0] = cfg["iou_thres"][psstr]
+            webcam_width[0] = cfg.get("webcam_width", {}).get(psstr, 1280)
+            webcam_height[0] = cfg.get("webcam_height", {}).get(psstr, 720)
+            pixel_scale = cfg["pixel_scale"]
+            use_hailo[0] = cfg.get("use_hailo", {}).get(psstr, False)
+            model_name_temp[0] = model_name[0]
+
+
+        initialize_var = False
+        
+    
+    while not __close_app:     
+        
+
+        if model_name_temp[0] != model_name[0]: #Reset classes
+            #class_names = []          ##EDIT
+            model_name_temp[0] = model_name[0]
+
+        
+        if save_config == 1:
+
+            
+            cfg["boschrexroth"] = hmi_password
+            
+            cfg["cameras"] = camera_qty
+
+            psstr = "First"
+            
+            cfg["onnx"][psstr] = model_name[0]
+            cfg["cam_select"][psstr] = variable[0]
+            cfg["conf_thres"][psstr] = hmi_conf_thres[0]
+            cfg["iou_thres"][psstr] = hmi_iou_thres[0]
+            cfg["webcam_width"][psstr] = webcam_width[0]
+            cfg["webcam_height"][psstr] = webcam_height[0]
+            cfg["pixel_scale"] = pixel_scale
+            cfg["use_hailo"][psstr] = use_hailo[0]
+
+
+            with open(MEDIA_FOLDER + "config.yaml", "w") as f:
+                cfg = yaml.dump(
+                    cfg, stream=f, default_flow_style=False, sort_keys=False
+                )
+            ###   
+
+            with open(MEDIA_FOLDER + "config.yaml") as f:
+                cfg = yaml.load(f, Loader=yaml.FullLoader)
+                print(cfg)
+    
+                hmi_password = cfg["boschrexroth"]
+                camera_qty = cfg["cameras"]
+                hmi_password_temp = hmi_password
+       
+                psstr = "First"    
+                    
+                model_name[0] = cfg["onnx"][psstr]
+                variable[0] = cfg["cam_select"][psstr]
+                hmi_conf_thres[0] = cfg["conf_thres"][psstr]
+                hmi_iou_thres[0] = cfg["iou_thres"][psstr]
+                webcam_width[0] = cfg.get("webcam_width", {}).get(psstr, 1280)
+                webcam_height[0] = cfg.get("webcam_height", {}).get(psstr, 720)
+                pixel_scale = cfg["pixel_scale"]
+                use_hailo[0] = cfg.get("use_hailo", {}).get(psstr, False)
+                model_name_temp[0] = model_name[0]
+
+
+            save_config = 0      
+
+        #for kk in range(5):
+        camera_processing(0)
+
+    
+        #camera_processing(0)
+        #camera_processing(1)
+        #camera_processing(2)
+        #camera_processing(3)
+        #camera_processing(4)
+        
+                
+if __name__ == "__main__":        
+    #sig()
+
+    try:
+
+        logger.info(f'First thread')
+        t1 = threading.Thread(target=main).start()
+        logger.info(f'Second thread')
+        t2 = threading.Thread(target=dl_provider).start()
+        sleep(3.0)
+        logger.info(f'Third thread')
+        t3 = threading.Thread(target=dl_client).start()
+        logger.info(f'Fourth thread')
+        t4 = threading.Thread(target=startApp).start()
+    except Exception as e:
+        logger.error("Error: " + str(e))  
