@@ -36,4 +36,5 @@ ___
 ## License
 
 SPDX-FileCopyrightText: Akra
-SPDX-License-Identifier: MIT
+
+The code in this folder is MIT-licensed, but the bundled Ultralytics YOLOv8 model files are AGPL-3.0, so the snap as distributed is provided under AGPL-3.0 (see `LICENSE` and `NOTICE`). Not affiliated with or endorsed by Ultralytics.

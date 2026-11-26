@@ -1,0 +1,18 @@
+ctrlX YOLO Instance Segmentation snap (ONNX/HEF)
+Copyright (c) Akra
+
+The source code written for this snap is MIT-licensed (see SPDX headers), but it
+is distributed together with Ultralytics YOLOv8 model files
+(dependencies/default/yolov8n.onnx, yolov8n-seg.onnx, yolov8n_seg.hef), which are
+licensed under AGPL-3.0 (https://ultralytics.com/license). The distributed snap
+as a whole is therefore provided under the GNU Affero General Public License
+v3.0 (see LICENSE). Complete corresponding source code:
+https://github.com/AKRA-off/ctrlx-os-snap-collection/tree/main/ctrlX-yolo-Instance_segmentation_ONNX_HEF
+
+If you cannot comply with AGPL-3.0 (for example when integrating into
+proprietary machine software), an Ultralytics Enterprise License is required, or
+the model files must be replaced with permissively licensed ones.
+
+The HEF file is a Hailo-compiled version of an Ultralytics model and follows the
+same license. Bootstrap and jQuery under dependencies/static are MIT.
+Bosch Rexroth Data Layer binaries, if present, keep their own terms.
